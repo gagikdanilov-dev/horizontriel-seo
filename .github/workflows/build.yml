@@ -38,7 +38,8 @@ jobs:
           SITE_BASE:     ${{ vars.SITE_BASE }}
           MAIN_SITE:     ${{ vars.MAIN_SITE }}
         run: python build.py
-        - uses: actions/configure-pages@v5
+
+      - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
