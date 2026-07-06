@@ -4,6 +4,11 @@ import html as _html
 import json
 from config import BRAND, SITE_BASE, MAIN_SITE
 
+# Коды подтверждения прав в поисковиках (вставляются метатегом на все страницы).
+# Google уже задан; для Яндекса вставишь код, когда будешь добавлять сайт в Вебмастер.
+GOOGLE_SITE_VERIFICATION = "0ieUYd6mckVELPEosd-_pgIJDCdaCYChlSByJ7KgkkY"
+YANDEX_VERIFICATION = ""
+
 def esc(s):
     return _html.escape("" if s is None else str(s), quote=True)
 
@@ -153,6 +158,8 @@ def page(*, title, description, canonical, body, jsonld=None, og_image=None,
 <meta name="robots" content="{robots}">
 <meta name="theme-color" content="#F5F1EB">
 <meta name="format-detection" content="telephone=yes">
+{('<meta name="google-site-verification" content="' + GOOGLE_SITE_VERIFICATION + '">') if GOOGLE_SITE_VERIFICATION else ''}
+{('<meta name="yandex-verification" content="' + YANDEX_VERIFICATION + '">') if YANDEX_VERIFICATION else ''}
 <link rel="canonical" href="{esc_attr(canonical)}">
 <link rel="alternate" hreflang="ru-RU" href="{esc_attr(canonical)}">
 <meta property="og:type" content="website">
