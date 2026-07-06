@@ -6,7 +6,7 @@ from config import BRAND, SITE_BASE, MAIN_SITE
 
 # Коды подтверждения прав в поисковиках (вставляются метатегом на все страницы).
 # Google уже задан; для Яндекса вставишь код, когда будешь добавлять сайт в Вебмастер.
-GOOGLE_SITE_VERIFICATION = "0ieUYd6mckVELPEosd-_pgIJDCdaCYChlSByJ7KgkkY"
+GOOGLE_SITE_VERIFICATION = "b_kU7sTduoZ18wQsGrXKJ31nZPn5_jYBJyz4q70pUFk"
 YANDEX_VERIFICATION = ""
 
 def esc(s):
