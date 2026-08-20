@@ -1,21 +1,37 @@
 # -*- coding: utf-8 -*-
 """HTML-шаблоны генератора. Визуально повторяют главный сайт HorizonTriel."""
+
 import html as _html
 import json
+
 from config import BRAND, SITE_BASE, MAIN_SITE
 
-# Коды подтверждения прав в поисковиках (вставляются метатегом на все страницы).
-# Google уже задан; для Яндекса вставишь код, когда будешь добавлять сайт в Вебмастер.
+
+# Коды подтверждения прав в поисковиках.
 GOOGLE_SITE_VERIFICATION = "b_kU7sTduoZ18wQsGrXKJ31nZPn5_jYBJyz4q70pUFk"
 YANDEX_VERIFICATION = ""
 
+
 def esc(s):
-    return _html.escape("" if s is None else str(s), quote=True)
+    return _html.escape(
+        ""
+        if s is None
+        else str(s),
+        quote=True
+    )
+
 
 def esc_attr(s):
-    return _html.escape("" if s is None else str(s), quote=True)
+    return _html.escape(
+        ""
+        if s is None
+        else str(s),
+        quote=True
+    )
 
-# ─────────────────────────── общий CSS (токены сайта) ───────────────────────────
+
+# ─────────────────────────── общий CSS ───────────────────────────
+
 CSS = """
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -29,6 +45,7 @@ body{font-family:var(--sans);background:var(--cream);color:var(--ink);font-size:
 a{color:inherit;text-decoration:none}
 img{max-width:100%;display:block}
 .wrap{max-width:1200px;margin:0 auto;padding:0 5vw}
+
 /* nav */
 nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:64px;padding:0 5vw;background:rgba(245,241,235,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(200,191,176,.4)}
 .brand{font-family:var(--serif);font-size:1.5rem;letter-spacing:.02em;color:var(--ink)}
@@ -36,10 +53,12 @@ nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-con
 .nav-links{display:flex;gap:1.5rem;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-mid)}
 .nav-links a:hover{color:var(--gold)}
 @media(max-width:720px){.nav-links{display:none}}
+
 /* breadcrumb */
 .crumbs{padding:1.25rem 0 0;font-size:.82rem;color:var(--ink-light)}
 .crumbs a:hover{color:var(--gold);text-decoration:underline}
 .crumbs span{color:var(--stone-dark);margin:0 .4rem}
+
 /* headings */
 .eyebrow{font-size:.78rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:.9rem}
 h1{font-family:var(--serif);font-weight:500;font-size:clamp(2rem,5vw,3.2rem);line-height:1.08;color:var(--ink);letter-spacing:-.01em}
@@ -47,10 +66,12 @@ h1 em{font-style:italic;color:var(--gold)}
 h2{font-family:var(--serif);font-weight:500;font-size:clamp(1.5rem,3.4vw,2.2rem);line-height:1.15;color:var(--ink);margin:0 0 1rem}
 .lead{font-size:1.02rem;color:var(--ink-mid);max-width:60ch;margin-top:1.1rem}
 .section{padding:3rem 0}
-/* stats row on cluster head */
+
+/* stats row */
 .facts{display:flex;flex-wrap:wrap;gap:2.5rem;margin-top:1.8rem;padding-top:1.5rem;border-top:1px solid var(--stone)}
 .fact .n{font-family:var(--serif);font-size:1.9rem;color:var(--gold);line-height:1}
 .fact .l{font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-light);margin-top:.35rem}
+
 /* card grid */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1.6rem;margin-top:2rem}
 .card{background:var(--white);border:1px solid rgba(200,191,176,.5);border-radius:2px;overflow:hidden;transition:box-shadow .3s,transform .3s;display:flex;flex-direction:column}
@@ -67,14 +88,17 @@ h2{font-family:var(--serif);font-weight:500;font-size:clamp(1.5rem,3.4vw,2.2rem)
 .card-meta{font-size:.83rem;color:var(--ink-light);margin-bottom:.9rem}
 .card-price{margin-top:auto;font-family:var(--serif);font-size:1.4rem;color:var(--ink)}
 .card-price sub{font-size:.62em;color:var(--ink-light)}
-/* pills / related links */
+
+/* pills */
 .pills{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1.6rem}
 .pill{border:1px solid var(--stone);color:var(--ink-mid);font-size:.85rem;padding:.4rem .85rem;border-radius:100px;transition:all .2s}
 .pill:hover{border-color:var(--gold);color:var(--gold)}
-/* SEO text block */
+
+/* SEO text */
 .prose{max-width:72ch;margin-top:1rem}
 .prose p{margin:.9rem 0;color:var(--ink-mid)}
 .prose h2{margin-top:2rem}
+
 /* FAQ */
 .faq{margin-top:1.4rem;border-top:1px solid var(--stone)}
 .faq details{border-bottom:1px solid var(--stone);padding:.2rem 0}
@@ -83,7 +107,8 @@ h2{font-family:var(--serif);font-weight:500;font-size:clamp(1.5rem,3.4vw,2.2rem)
 .faq summary::after{content:'+';color:var(--gold);font-size:1.3rem}
 .faq details[open] summary::after{content:'–'}
 .faq .a{padding:0 0 1.1rem;color:var(--ink-mid);max-width:70ch}
-/* ── object detail ── */
+
+/* object detail */
 .obj{display:grid;grid-template-columns:1.15fr .85fr;gap:2.5rem;margin-top:1.5rem;align-items:start}
 @media(max-width:860px){.obj{grid-template-columns:1fr}}
 .gallery{display:flex;flex-direction:column;gap:.7rem}
@@ -115,6 +140,7 @@ h2{font-family:var(--serif);font-weight:500;font-size:clamp(1.5rem,3.4vw,2.2rem)
 .btn-max{background:var(--ink);color:var(--cream)}
 .btn-call{background:var(--gold);color:#fff}
 .btn-ghost{background:transparent;border-color:var(--stone);color:var(--ink-mid)}
+
 /* footer */
 footer{margin-top:4rem;background:var(--ink);color:var(--cream)}
 .foot{max-width:1200px;margin:0 auto;padding:3rem 5vw;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:2rem}
@@ -128,26 +154,62 @@ footer{margin-top:4rem;background:var(--ink);color:var(--cream)}
 .copy{border-top:1px solid rgba(245,241,235,.12);padding:1.2rem 5vw;font-size:.8rem;color:rgba(245,241,235,.45);text-align:center}
 """
 
-FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
-         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-         '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">')
+
+FONTS = (
+    '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    '<link href="https://fonts.googleapis.com/css2?'
+    'family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500'
+    '&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">'
+)
 
 
 def json_ld(objs):
     out = []
+
     for o in objs:
         if o:
-            out.append('<script type="application/ld+json">' +
-                       json.dumps(o, ensure_ascii=False, separators=(",", ":")) + "</script>")
+            out.append(
+                '<script type="application/ld+json">'
+                + json.dumps(
+                    o,
+                    ensure_ascii=False,
+                    separators=(",", ":")
+                )
+                + "</script>"
+            )
+
     return "\n".join(out)
 
 
-def page(*, title, description, canonical, body, jsonld=None, og_image=None,
-         robots="index, follow, max-image-preview:large"):
+def page(
+    *,
+    title,
+    description,
+    canonical,
+    body,
+    jsonld=None,
+    og_image=None,
+    robots="index, follow, max-image-preview:large"
+):
     """Собирает полный HTML-документ."""
-    og = ('<meta property="og:image" content="%s">' % esc_attr(og_image)) if og_image else ""
-    tw_card = "summary_large_image" if og_image else "summary"
-    tw_img = ('<meta name="twitter:image" content="%s">' % esc_attr(og_image)) if og_image else ""
+
+    og = (
+        '<meta property="og:image" content="%s">'
+        % esc_attr(og_image)
+    ) if og_image else ""
+
+    tw_card = (
+        "summary_large_image"
+        if og_image
+        else "summary"
+    )
+
+    tw_img = (
+        '<meta name="twitter:image" content="%s">'
+        % esc_attr(og_image)
+    ) if og_image else ""
+
     return f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -155,7 +217,7 @@ def page(*, title, description, canonical, body, jsonld=None, og_image=None,
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(title)}</title>
 <meta name="description" content="{esc_attr(description)}">
-<meta name="robots" content="{robots}">
+<meta name="robots" content="{esc_attr(robots)}">
 <meta name="theme-color" content="#F5F1EB">
 <meta name="format-detection" content="telephone=yes">
 {('<meta name="google-site-verification" content="' + GOOGLE_SITE_VERIFICATION + '">') if GOOGLE_SITE_VERIFICATION else ''}
@@ -179,7 +241,7 @@ def page(*, title, description, canonical, body, jsonld=None, og_image=None,
 </head>
 <body>
 <nav>
-  <a class="brand" href="{SITE_BASE}/">Horizon<b>Triel</b></a>
+  <a class="brand" href="{MAIN_SITE}/">Horizon<b>Triel</b></a>
   <div class="nav-links">
     <a href="{SITE_BASE}/">Каталог</a>
     <a href="{MAIN_SITE}/#process">Как работаем</a>
@@ -193,76 +255,202 @@ def page(*, title, description, canonical, body, jsonld=None, og_image=None,
 
 
 def breadcrumbs_html(items):
-    """items: [(name, url|None), ...] последний — текущий (url None)."""
+    """
+    items: [(name, url|None), ...]
+    последний элемент — текущая страница.
+    """
+
     parts = []
+
     for i, (name, url) in enumerate(items):
         if url:
-            parts.append(f'<a href="{esc_attr(url)}">{esc(name)}</a>')
+            parts.append(
+                f'<a href="{esc_attr(url)}">{esc(name)}</a>'
+            )
         else:
-            parts.append(esc(name))
+            parts.append(
+                esc(name)
+            )
+
         if i < len(items) - 1:
-            parts.append("<span>/</span>")
-    return '<div class="wrap"><div class="crumbs">' + "".join(parts) + "</div></div>"
+            parts.append(
+                "<span>/</span>"
+            )
+
+    return (
+        '<div class="wrap">'
+        '<div class="crumbs">'
+        + "".join(parts)
+        + "</div></div>"
+    )
 
 
 def _price_card(n):
     n = int(n or 0)
+
     if not n:
         return "Цена по запросу"
+
     if n >= 1_000_000:
-        v = f"{n/1_000_000:.1f}".rstrip("0").rstrip(".")
-        return f"{v} млн <sub>₽</sub>"
+        v = (
+            f"{n / 1_000_000:.1f}"
+            .rstrip("0")
+            .rstrip(".")
+        )
+
+        return (
+            f"{v} млн <sub>₽</sub>"
+        )
+
     if n >= 1000:
-        return f"{round(n/1000):,}".replace(",", " ") + " тыс. <sub>₽</sub>"
-    return f"{n:,}".replace(",", " ") + " <sub>₽</sub>"
+        return (
+            f"{round(n / 1000):,}"
+            .replace(",", " ")
+            + " тыс. <sub>₽</sub>"
+        )
+
+    return (
+        f"{n:,}".replace(",", " ")
+        + " <sub>₽</sub>"
+    )
 
 
 def card(obj):
-    """Карточка объекта в сетке. obj — dict из build.normalize(), с полем 'url'."""
-    place = " · ".join([x for x in (obj.get("region"), obj.get("city")) if x])
-    alt = " — ".join([x for x in (obj.get("title"), obj.get("type"), obj.get("region"), obj.get("city")) if x])
-    imgs = obj.get("images") or []
+    """Карточка объекта в сетке."""
+
+    place = " · ".join(
+        [
+            x
+            for x in (
+                obj.get("region"),
+                obj.get("city")
+            )
+            if x
+        ]
+    )
+
+    alt = " — ".join(
+        [
+            x
+            for x in (
+                obj.get("title"),
+                obj.get("type"),
+                obj.get("region"),
+                obj.get("city")
+            )
+            if x
+        ]
+    )
+
+    imgs = (
+        obj.get("images")
+        or []
+    )
+
     if imgs:
-        img = f'<img src="{esc_attr(imgs[0])}" alt="{esc_attr(alt)}" loading="lazy" decoding="async">'
+        img = (
+            f'<img src="{esc_attr(imgs[0])}" '
+            f'alt="{esc_attr(alt)}" '
+            'loading="lazy" decoding="async">'
+        )
     else:
-        img = ('<div class="card-noimg"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" '
-               'stroke="currentColor" stroke-width="1.3"><rect x="3" y="3" width="18" height="18" rx="2"/>'
-               '<circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg></div>')
+        img = (
+            '<div class="card-noimg">'
+            '<svg width="34" height="34" '
+            'viewBox="0 0 24 24" fill="none" '
+            'stroke="currentColor" stroke-width="1.3">'
+            '<rect x="3" y="3" width="18" height="18" rx="2"/>'
+            '<circle cx="9" cy="9" r="2"/>'
+            '<path d="M21 15l-5-5L5 21"/>'
+            '</svg></div>'
+        )
+
     tag = ""
+
     if obj.get("tag") == "new":
-        tag = '<span class="tag">Новое</span>'
+        tag = (
+            '<span class="tag">Новое</span>'
+        )
     elif obj.get("tag") == "hot":
-        tag = '<span class="tag hot">Топ</span>'
+        tag = (
+            '<span class="tag hot">Топ</span>'
+        )
+
     meta_bits = []
-    if obj.get("residential_complex"): meta_bits.append("ЖК " + str(obj["residential_complex"]))
-    if obj.get("area"): meta_bits.append(f'{obj["area"]} м²')
-    if obj.get("rooms"): meta_bits.append(f'{obj["rooms"]} комн.')
-    if obj.get("land"): meta_bits.append(f'{obj["land"]} сот.')
-    if obj.get("floors"): meta_bits.append(f'{obj["floors"]} эт.')
-    meta = " · ".join(meta_bits)
+
+    if obj.get("residential_complex"):
+        meta_bits.append(
+            "ЖК "
+            + str(
+                obj["residential_complex"]
+            )
+        )
+
+    if obj.get("area"):
+        meta_bits.append(
+            f'{obj["area"]} м²'
+        )
+
+    if obj.get("rooms"):
+        meta_bits.append(
+            f'{obj["rooms"]} комн.'
+        )
+
+    if obj.get("land"):
+        meta_bits.append(
+            f'{obj["land"]} сот.'
+        )
+
+    if obj.get("floors"):
+        meta_bits.append(
+            f'{obj["floors"]} эт.'
+        )
+
+    meta = " · ".join(
+        meta_bits
+    )
+
     return (
         f'<a class="card" href="{esc_attr(obj["url"])}">'
         f'<div class="card-img">{img}{tag}</div>'
-        f'<div class="card-b">'
+        '<div class="card-b">'
         f'<div class="card-city">{esc(place)}</div>'
         f'<div class="card-t">{esc(obj.get("title") or "Объект недвижимости")}</div>'
-        + (f'<div class="card-meta">{esc(meta)}</div>' if meta else "")
+        + (
+            f'<div class="card-meta">{esc(meta)}</div>'
+            if meta
+            else ""
+        )
         + f'<div class="card-price">{_price_card(obj.get("price"))}</div>'
-        f'</div></a>'
+        '</div></a>'
     )
 
 
 def footer(settings, seo_links):
-    """seo_links: [(label, url), ...] для нижнего блока перелинковки."""
-    tel = settings.get("tel", "")
-    tel_href = "".join(c for c in tel if c.isdigit() or c == "+")
-    links_html = "".join(f'<a href="{esc_attr(u)}">{esc(l)}</a>' for l, u in seo_links)
+    """seo_links: [(label, url), ...] для нижней перелинковки."""
+
+    tel = settings.get(
+        "tel",
+        ""
+    )
+
+    tel_href = "".join(
+        c
+        for c in tel
+        if c.isdigit() or c == "+"
+    )
+
+    links_html = "".join(
+        f'<a href="{esc_attr(u)}">{esc(label)}</a>'
+        for label, u in seo_links
+    )
+
     return f"""
 <footer>
   <div class="foot">
     <div>
-      <a class="brand" href="{SITE_BASE}/">Horizon<b>Triel</b></a>
-      <p>Подбор, проверка и сопровождение сделок с недвижимостью по всей России — квартиры, дома, участки, гаражи и коммерческие объекты.</p>
+      <a class="brand" href="{MAIN_SITE}/">Horizon<b>Triel</b></a>
+      <p>Подбор, проверка и сопровождение сделок с недвижимостью в Ставропольском крае и на Кавказских Минеральных Водах — квартиры, дома, участки, гаражи и коммерческие объекты.</p>
     </div>
     <div>
       <h4>Связь</h4>
@@ -277,5 +465,5 @@ def footer(settings, seo_links):
       <div class="foot-links">{links_html}</div>
     </div>
   </div>
-  <div class="copy">© {BRAND}. Недвижимость по России. Информация на сайте не является публичной офертой.</div>
+  <div class="copy">© {BRAND}. Недвижимость в Ставропольском крае и на КМВ. Информация на сайте не является публичной офертой.</div>
 </footer>"""
