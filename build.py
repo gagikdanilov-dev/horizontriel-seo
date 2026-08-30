@@ -2066,8 +2066,13 @@ def build():
         )
 
     # ── Город ──
+    # Пустые города вообще НЕ публикуем.
+    # Если в городе нет опубликованных объектов, страницы в dist не будет,
+    # поэтому после деплоя URL отдаст 404 и никто не увидит пустышку.
+    # Как только появится объект — страница создастся автоматически.
     for c, v in by_city.items():
-        empty = not v
+        if not v:
+            continue
 
         (
             h1,
@@ -2075,13 +2080,9 @@ def build():
             sd,
             paras,
             faq
-        ) = (
-            empty_texts_city(c)
-            if empty
-            else cluster_texts_city(
-                c,
-                v
-            )
+        ) = cluster_texts_city(
+            c,
+            v
         )
 
         crumbs = [
@@ -2095,20 +2096,16 @@ def build():
             )
         ]
 
-        related = (
-            available_links
-            if empty
-            else [
-                (
-                    type_meta(tt)["plural"],
-                    C.SITE_BASE
-                    + f'/gorod/{slugify(c)}/{type_meta(tt)["slug"]}/'
-                )
-                for (cc, tt)
-                in by_city_type
-                if cc == c
-            ]
-        )
+        related = [
+            (
+                type_meta(tt)["plural"],
+                C.SITE_BASE
+                + f'/gorod/{slugify(c)}/{type_meta(tt)["slug"]}/'
+            )
+            for (cc, tt)
+            in by_city_type
+            if cc == c
+        ]
 
         write_page(
             f'/gorod/{slugify(c)}/',
@@ -2125,17 +2122,10 @@ def build():
                 related=related,
                 faq=faq,
                 path=f'/gorod/{slugify(c)}/',
-                robots=(
-                    "noindex, follow"
-                    if empty
-                    else (
-                        "index, follow, "
-                        "max-image-preview:large"
-                    )
-                ),
+                robots="index, follow, max-image-preview:large",
             ),
             urls,
-            index=not empty,
+            index=True,
         )
 
     # ── Регион ──
@@ -2349,7 +2339,7 @@ def build():
 
     if empty_priority_cities:
         print(
-            "• пустые города -> 200 + NOINDEX, вне sitemap: "
+            "• пустые города -> НЕ ПУБЛИКУЮТСЯ (404), вне sitemap: "
             + ", ".join(empty_priority_cities)
         )
     print(
