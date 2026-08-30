@@ -751,6 +751,62 @@ def render_object(o, settings, similar):
 _hub_seo_links_cache = []
 
 
+
+def main_catalog_url(*, city="", ttype="", region=""):
+    """
+    Ссылка на основной каталог HorizonTriel с фильтрами в hash.
+    Hash не создаёт отдельную индексируемую URL-страницу.
+    MAIN CATALOG ROUTER v3 на Tilda применит фильтр и очистит hash до #catalog.
+    """
+    parts = []
+
+    if city:
+        parts.append("city=" + slugify(city))
+
+    if ttype:
+        parts.append("type=" + type_meta(ttype)["slug"])
+
+    if region:
+        parts.append("region=" + slugify(region))
+
+    suffix = ""
+    if parts:
+        suffix = "?" + "&".join(parts)
+
+    return C.MAIN_SITE + "/#catalog" + suffix
+
+
+def main_catalog_jump(kind, key):
+    city = ""
+    ttype = ""
+    region = ""
+
+    if kind == "city":
+        city = key or ""
+    elif kind == "type":
+        ttype = key or ""
+    elif kind == "region":
+        region = key or ""
+    elif kind == "city_type" and isinstance(key, (tuple, list)) and len(key) >= 2:
+        city, ttype = key[0], key[1]
+
+    href = main_catalog_url(
+        city=city,
+        ttype=ttype,
+        region=region
+    )
+
+    return (
+        '<div class="main-catalog-jump">'
+        '<div class="txt">'
+        '<b>Открыть объекты в основном каталоге HorizonTriel</b>'
+        'Фильтр уже будет выбран автоматически. '
+        'Вы останетесь на основном сайте horizontriel.com.'
+        '</div>'
+        f'<a class="go" href="{esc_attr(href)}">Смотреть объекты →</a>'
+        '</div>'
+    )
+
 def contact_cta(settings):
     tel_href = "".join(
         c
@@ -805,7 +861,8 @@ def render_cluster(
             f'Каталог · {esc(kind_label(kind))}'
             '</div>'
             f'<h1>{h1}</h1>'
-            '<div class="prose">'
+            + main_catalog_jump(kind, key)
+            + '<div class="prose">'
             '<p>В этой категории пока нет опубликованных объектов. '
             'Оставьте заявку — подберём подходящий вариант '
             'в Ставропольском крае под ваш бюджет и цель.</p>'
@@ -883,6 +940,7 @@ def render_cluster(
         f'Каталог · {esc(kind_label(kind))}'
         '</div>'
         f'<h1>{h1}</h1>'
+        + main_catalog_jump(kind, key)
         + facts_row(st)
         + prose
         + grid
