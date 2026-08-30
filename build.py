@@ -2298,6 +2298,27 @@ def build():
     write_robots()
     write_cname()
 
+    # Яндекс.Вебмастер — подтверждение прав на catalog.horizontriel.com
+    yandex_verify_path = os.path.join(
+        C.OUT_DIR,
+        "yandex_5ff2d38937c8c74f.html"
+    )
+
+    with open(
+        yandex_verify_path,
+        "w",
+        encoding="utf-8"
+    ) as f:
+        f.write(
+            '<html>\n'
+            '    <head>\n'
+            '        <meta http-equiv="Content-Type" '
+            'content="text/html; charset=UTF-8">\n'
+            '    </head>\n'
+            '    <body>Verification: 5ff2d38937c8c74f</body>\n'
+            '</html>\n'
+        )
+
     print(
         f"• индексируемых URL "
         f"в sitemap: {len(urls)}"
