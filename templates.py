@@ -141,6 +141,55 @@ h2{font-family:var(--serif);font-weight:500;font-size:clamp(1.5rem,3.4vw,2.2rem)
 .btn-call{background:var(--gold);color:#fff}
 .btn-ghost{background:transparent;border-color:var(--stone);color:var(--ink-mid)}
 
+.main-catalog-jump{
+  margin:22px 0 30px;
+  padding:18px 20px;
+  border:1px solid rgba(184,147,90,.42);
+  background:#fffaf3;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  flex-wrap:wrap;
+}
+.main-catalog-jump .txt{
+  font-size:13px;
+  line-height:1.6;
+  color:var(--ink-light);
+  max-width:720px;
+}
+.main-catalog-jump .txt b{
+  display:block;
+  margin-bottom:3px;
+  color:var(--ink);
+  font-family:var(--serif);
+  font-size:21px;
+  font-weight:500;
+}
+.main-catalog-jump .go{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:46px;
+  padding:0 20px;
+  background:var(--ink);
+  color:#fff;
+  text-decoration:none;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.04em;
+  white-space:nowrap;
+  transition:background .2s ease,transform .2s ease;
+}
+.main-catalog-jump .go:hover{
+  background:var(--gold);
+  transform:translateY(-1px);
+}
+@media(max-width:640px){
+  .main-catalog-jump{padding:16px}
+  .main-catalog-jump .go{width:100%}
+}
+
 /* footer */
 footer{margin-top:4rem;background:var(--ink);color:var(--cream)}
 .foot{max-width:1200px;margin:0 auto;padding:3rem 5vw;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:2rem}
@@ -243,7 +292,7 @@ def page(
 <nav>
   <a class="brand" href="{MAIN_SITE}/">Horizon<b>Triel</b></a>
   <div class="nav-links">
-    <a href="{SITE_BASE}/">Каталог</a>
+    <a href="{MAIN_SITE}/#catalog">Каталог</a>
     <a href="{MAIN_SITE}/#process">Как работаем</a>
     <a href="{MAIN_SITE}/#calc">Ипотека</a>
     <a href="{MAIN_SITE}/#contact">Контакты</a>
@@ -264,8 +313,13 @@ def breadcrumbs_html(items):
 
     for i, (name, url) in enumerate(items):
         if url:
+            user_url = url
+
+            if str(url).rstrip("/") == SITE_BASE.rstrip("/"):
+                user_url = MAIN_SITE + "/#catalog"
+
             parts.append(
-                f'<a href="{esc_attr(url)}">{esc(name)}</a>'
+                f'<a href="{esc_attr(user_url)}">{esc(name)}</a>'
             )
         else:
             parts.append(
