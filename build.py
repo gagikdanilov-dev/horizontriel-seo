@@ -2331,6 +2331,27 @@ def build():
     print(
         f"  — объектов: {len(objs)}"
     )
+
+    empty_priority_cities = [
+        c for c in C.PRIORITY_CITIES
+        if not by_city.get(c)
+    ]
+    indexed_priority_cities = [
+        c for c in C.PRIORITY_CITIES
+        if by_city.get(c)
+    ]
+
+    if indexed_priority_cities:
+        print(
+            "• города с объектами -> INDEX + sitemap: "
+            + ", ".join(indexed_priority_cities)
+        )
+
+    if empty_priority_cities:
+        print(
+            "• пустые города -> 200 + NOINDEX, вне sitemap: "
+            + ", ".join(empty_priority_cities)
+        )
     print(
         f"  — типы: {len(by_type)}"
         f" | города: {len(by_city)}"
