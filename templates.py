@@ -315,6 +315,8 @@ def breadcrumbs_html(items):
         if url:
             user_url = url
 
+            # Корень отдельного SEO-каталога для пользователя ведёт
+            # в основной интерактивный каталог на Tilda.
             if str(url).rstrip("/") == SITE_BASE.rstrip("/"):
                 user_url = MAIN_SITE + "/#catalog"
 
