@@ -646,6 +646,10 @@ def render_object(o, settings, similar):
         )
         + f'<h1>{esc(o.get("title") or "Объект недвижимости")}</h1>'
         + price_row
+        + main_catalog_jump(
+            "city_type",
+            (o.get("city") or "", o.get("type") or "")
+        )
         + params
         + promo
         + desc
@@ -800,8 +804,8 @@ def main_catalog_jump(kind, key):
         '<div class="main-catalog-jump">'
         '<div class="txt">'
         '<b>Открыть объекты в основном каталоге HorizonTriel</b>'
-        'Фильтр уже будет выбран автоматически. '
-        'Вы останетесь на основном сайте horizontriel.com.'
+        'Фильтр по городу и типу будет выбран автоматически. '
+        'Все объекты открываются в основном каталоге horizontriel.com.'
         '</div>'
         f'<a class="go" href="{esc_attr(href)}">Смотреть объекты →</a>'
         '</div>'
