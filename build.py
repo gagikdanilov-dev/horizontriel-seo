@@ -87,8 +87,10 @@ def fetch_settings():
         rec = {}
 
     return {
-        "tel": rec.get("tel") or C.FALLBACK_SETTINGS["tel"],
-        "wa": rec.get("wa") or C.FALLBACK_SETTINGS["wa"],
+        # Основной номер HorizonTriel задаём централизованно в config.py.
+        # Так старое значение в PocketBase site_settings не вернёт старый телефон на SEO-страницы.
+        "tel": C.FALLBACK_SETTINGS["tel"],
+        "wa": C.FALLBACK_SETTINGS["wa"],
         "tg": rec.get("tg") or C.FALLBACK_SETTINGS["tg"],
         "max": (
             rec.get("max_url")
