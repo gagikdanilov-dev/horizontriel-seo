@@ -31,8 +31,8 @@ SEO_REGION = "Ставропольский край"
 
 # Резервные контакты, если site_settings недоступны
 FALLBACK_SETTINGS = {
-    "tel": "+7 905 412 7314",
-    "wa": "79054127314",
+    "tel": "+7 905 418 8095",
+    "wa": "79054188095",
     "tg": "https://t.me/mikhail_korolev1977",
     "max": "https://max.ru/join/ypfQ0KRhQbnEeNU-M-qs1czsE97KJd6C6Yg-2R9_tIQ",
     "email": "horizontriel@gmail.com",
