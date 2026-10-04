@@ -1944,6 +1944,29 @@ def build():
             []
         )
 
+    # Полная SEO-матрица:
+    # каждый город, в котором есть хотя бы один объект,
+    # получает страницы всех известных типов недвижимости.
+    # Пустые сочетания будут noindex и вне sitemap.
+    seo_types = list(by_type.keys())
+
+    for t in C.PRIORITY_TYPES:
+        if t not in seo_types:
+            seo_types.append(t)
+
+    for c, city_objs in by_city.items():
+        if not city_objs:
+            continue
+
+        for t in seo_types:
+            by_city_type.setdefault(
+                (
+                    c,
+                    t
+                ),
+                []
+            )
+
     available_links = (
         [
             (
@@ -2277,18 +2300,63 @@ def build():
     # ── Город × тип ──
     for (c, t), v in by_city_type.items():
         tm = type_meta(t)
+        empty = not v
 
-        (
-            h1,
-            st_t,
-            sd,
-            paras,
-            faq
-        ) = cluster_texts_city_type(
-            c,
-            t,
-            v
-        )
+        if empty:
+            cp = city_prep(c)
+
+            if t == "Коммерция":
+                h1 = (
+                    f'Коммерческая недвижимость {cp} — '
+                    '<em>подбор объектов</em>'
+                )
+                st_t = (
+                    f'Коммерческая недвижимость {cp} '
+                    f'| {C.BRAND}'
+                )
+                sd = (
+                    f'Коммерческая недвижимость {cp}. '
+                    'Подбор помещений, офисов, гостиниц и других '
+                    'коммерческих объектов. Оставьте заявку — '
+                    'подберём подходящее предложение.'
+                )
+            else:
+                h1 = (
+                    f'Купить {tm["gen"]} '
+                    f'{cp} — <em>{C.BRAND}</em>'
+                )
+                st_t = (
+                    f'Купить {tm["gen"]} '
+                    f'{cp} | {C.BRAND}'
+                )
+                sd = (
+                    f'{tm["plural"]} {cp}. '
+                    'Подбор недвижимости под ваш бюджет и задачу. '
+                    'Проверка объекта и сопровождение сделки.'
+                )
+
+            paras = [
+                (
+                    f'Ищете {tm["plural"].lower()} {cp}? '
+                    'Оставьте заявку — подберём актуальные '
+                    'предложения под бюджет, район и цель покупки.'
+                )
+            ]
+
+            faq = None
+
+        else:
+            (
+                h1,
+                st_t,
+                sd,
+                paras,
+                faq
+            ) = cluster_texts_city_type(
+                c,
+                t,
+                v
+            )
 
         crumbs = [
             (
@@ -2349,8 +2417,17 @@ def build():
                     f'/gorod/{slugify(c)}/'
                     f'{tm["slug"]}/'
                 ),
+                robots=(
+                    "noindex, follow"
+                    if empty
+                    else (
+                        "index, follow, "
+                        "max-image-preview:large"
+                    )
+                ),
             ),
             urls,
+            index=not empty,
         )
 
     write_sitemap(urls)
