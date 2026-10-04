@@ -1233,8 +1233,8 @@ def render_hub(
             "@context": "https://schema.org",
             "@type": "WebSite",
             "name": C.BRAND,
-            # Брендовый WebSite — основной домен, не поддомен каталога.
-            "url": C.MAIN_SITE + "/",
+            # Каталог — самостоятельный индексируемый WebSite.
+            "url": C.SITE_BASE + "/",
             "inLanguage": "ru-RU",
         },
         {
@@ -1268,17 +1268,15 @@ def render_hub(
         None,
     )
 
-    # КЛЮЧЕВО:
-    # canonical -> основной сайт
-    # robots -> noindex, follow
+    # Корень каталога — полноценный индексируемый SEO-хаб.
     return page(
         title=seo_title,
         description=seo_desc,
-        canonical=C.MAIN_SITE + "/",
+        canonical=C.SITE_BASE + "/",
         body=body,
         jsonld=ld,
         og_image=og_img,
-        robots="noindex, follow",
+        robots="index, follow, max-image-preview:large",
     )
 
 
@@ -2034,7 +2032,7 @@ def build():
     urls = []
 
     # ── Корень каталога ──
-    # Генерируем, но НЕ добавляем в sitemap.
+    # Главный SEO-хаб каталога индексируется и входит в sitemap.
     write_page(
         "/",
         render_hub(
@@ -2045,7 +2043,7 @@ def build():
             settings
         ),
         urls,
-        index=False,
+        index=True,
     )
 
     # ── Объекты ──
