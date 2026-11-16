@@ -9,7 +9,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -38,6 +38,35 @@ jobs:
           SITE_BASE:     ${{ vars.SITE_BASE }}
           MAIN_SITE:     ${{ vars.MAIN_SITE }}
         run: python build.py
+
+      # HT_SEO_GITHUB_PERSIST_URLS_V1
+      # Carry canonical object URLs across disposable GitHub Actions runners.
+      # Stop deployment if the registry cannot be stored; never silently
+      # publish new object URLs when the registry could be lost.
+      - name: Persist stable SEO object URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .horizontriel-seo-stable-urls.json
+          python3 - <<'PYCHECK'
+          import json
+          import re
+          from pathlib import Path
+          d = json.loads(Path('.horizontriel-seo-stable-urls.json').read_text(encoding='utf-8'))
+          assert d['version'] == 1 and isinstance(d['paths'], dict), 'Invalid SEO URL history'
+          assert len(d['paths']) >= 1, 'Empty SEO URL history'
+          for rid, path in d['paths'].items():
+              assert len(rid) >= 6 and isinstance(path, str), 'Invalid record ID/path'
+              assert re.fullmatch(r'/obekt/[a-z0-9][a-z0-9-]*-' + re.escape(rid[-6:].lower()) + r'/', path), 'Invalid SEO URL'
+          print('Permanent SEO URLs:', len(d['paths']))
+          PYCHECK
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- .horizontriel-seo-stable-urls.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore(seo): persist canonical listing URLs [skip ci]'
+            git push origin HEAD:main
+          fi
 
       - uses: actions/configure-pages@v5
 

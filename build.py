@@ -187,6 +187,164 @@ def normalize(r):
     }
 
 
+# HT_STABLE_SEO_URLS_V1
+# Persistence is OUTSIDE dist because the normal build deletes dist on every run.
+# Only public, already-generated object paths become permanent URLs.
+def htseo_url_history_file():
+    return os.path.join(
+        os.path.dirname(os.path.abspath(C.OUT_DIR)),
+        ".horizontriel-seo-stable-urls.json"
+    )
+
+
+def htseo_valid_listing_path(path, record_id):
+    # Prevent traversal and do not confuse canonical paths of different IDs.
+    import re
+    rid = str(record_id or "")
+    if not rid or len(rid) < 6 or not isinstance(path, str):
+        return False
+    return bool(re.fullmatch(
+        r"/obekt/[a-z0-9][a-z0-9-]*-" + re.escape(rid[-6:].lower()) + r"/",
+        path,
+    ))
+
+
+def htseo_load_stable_urls(objs):
+    import json
+    history_file = htseo_url_history_file()
+    found = {}
+    if os.path.isfile(history_file):
+        with open(history_file, encoding="utf-8") as f:
+            saved = json.load(f)
+        if not isinstance(saved, dict) or saved.get("version") != 1 or not isinstance(saved.get("paths"), dict):
+            raise RuntimeError("Invalid SEO URL history; refusing to rebuild with changed URLs: " + history_file)
+        for rid, url in saved["paths"].items():
+            if not htseo_valid_listing_path(url, rid):
+                raise RuntimeError("Invalid SEO URL history entry for ID: " + str(rid))
+            found[rid] = url
+
+    # On first run, prefer already published URLs from the public Sitemap.
+    # This also works when a deploy process builds in a fresh directory.
+    if not os.path.isfile(history_file) and not SAMPLE:
+        try:
+            import urllib.request
+            import xml.etree.ElementTree as ET
+            import urllib.parse
+            req = urllib.request.Request(
+                C.SITE_BASE + "/sitemap.xml",
+                headers={"User-Agent": "HorizonTriel-stable-URL-bootstrap/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=12) as response:
+                if response.status != 200:
+                    raise RuntimeError("Public SEO sitemap did not return 200")
+                raw_xml = response.read(2000001)
+            if len(raw_xml) > 2000000:
+                raise RuntimeError("Public SEO sitemap is unexpectedly large")
+            root = ET.fromstring(raw_xml)
+            live = {}
+            for item in root.iter():
+                if not item.tag.endswith("}loc") or not item.text:
+                    continue
+                parsed = urllib.parse.urlsplit(item.text.strip())
+                if parsed.netloc != urllib.parse.urlsplit(C.SITE_BASE).netloc:
+                    continue
+                path = parsed.path
+                if not path.startswith("/obekt/"):
+                    continue
+                suffix = path.rstrip("/").rsplit("-", 1)[-1]
+                for o in objs:
+                    rid = str(o.get("id") or "")
+                    if rid[-6:].lower() == suffix and htseo_valid_listing_path(path, rid):
+                        if rid in live and live[rid] != path:
+                            raise RuntimeError("Conflicting public URLs for ID " + rid)
+                        live[rid] = path
+            found.update(live)
+            print("• HT SEO URL bootstrap: public Sitemap matched", len(live), "listing IDs")
+        except Exception as exc:
+            print("• HT SEO URL bootstrap: public Sitemap unavailable:", type(exc).__name__, str(exc)[:150])
+
+    # Bootstrap remaining IDs from locally generated output, if present.
+    # This MUST run before build removes dist.
+    old_dir = os.path.join(C.OUT_DIR, "obekt")
+    if os.path.isdir(old_dir):
+        id_suffixes = {}
+        for o in objs:
+            rid = str(o.get("id") or "")
+            if len(rid) >= 6:
+                id_suffixes.setdefault(rid[-6:].lower(), []).append(rid)
+        candidates = {}
+        for entry in os.scandir(old_dir):
+            if not entry.is_dir(follow_symlinks=False):
+                continue
+            if not os.path.isfile(os.path.join(entry.path, "index.html")):
+                continue
+            name = entry.name
+            suffix = name.rsplit("-", 1)[-1]
+            for rid in id_suffixes.get(suffix, []):
+                path = "/obekt/" + name + "/"
+                if htseo_valid_listing_path(path, rid):
+                    candidates.setdefault(rid, []).append(path)
+        for o in objs:
+            rid = str(o.get("id") or "")
+            if rid in found:
+                continue
+            paths = candidates.get(rid, [])
+            if len(paths) == 1:
+                found[rid] = paths[0]
+            elif len(paths) > 1:
+                # Multiple archived paths: only choose unambiguously.
+                current = obj_url(o)
+                if current in paths:
+                    found[rid] = current
+                else:
+                    raise RuntimeError("Multiple old SEO URLs for ID " + rid + "; manual audit required")
+    # Existing published sites must not silently replace EVERY URL because
+    # neither the public Sitemap nor the previous output was available.
+    if objs and not SAMPLE and not found and not os.path.isfile(history_file):
+        raise RuntimeError(
+            "No existing SEO object URLs could be bootstrapped. "
+            "Aborting rather than changing all canonical URLs."
+        )
+    return found
+
+
+def htseo_assign_stable_urls(objs, history):
+    used = {}
+    for o in objs:
+        rid = str(o.get("id") or "")
+        if not rid:
+            raise RuntimeError("Listing without ID; SEO URL assignment aborted")
+        path = history.get(rid) or obj_url(o)
+        if not htseo_valid_listing_path(path, rid):
+            raise RuntimeError("Invalid SEO object path for ID " + rid + ": " + str(path))
+        if path in used and used[path] != rid:
+            raise RuntimeError("SEO URL collision " + path + " between " + used[path] + " and " + rid)
+        used[path] = rid
+        history[rid] = path
+        o["url"] = path
+    return history
+
+
+def htseo_save_stable_urls(history):
+    import json
+    import tempfile
+    target = htseo_url_history_file()
+    parent = os.path.dirname(target)
+    os.makedirs(parent, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".htseo-url-history-", suffix=".tmp", dir=parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump({"version": 1, "paths": history}, f, ensure_ascii=False, sort_keys=True, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, target)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
 def obj_url(o):
     base = slugify(
         o.get("title") or o.get("type") or "obekt"
@@ -1867,7 +2025,10 @@ def build():
 
     for o in objs:
         o["city"] = canonical_city(o.get("city"))
-        o["url"] = obj_url(o)
+    # Read existing paths before clearing the static output; never change canonical
+    # paths when a title is edited or extra placement categories are selected.
+    htseo_url_history = htseo_load_stable_urls(objs)
+    htseo_assign_stable_urls(objs, htseo_url_history)
 
     print(
         f"• объектов опубликовано всего: "
@@ -2431,6 +2592,9 @@ def build():
     write_sitemap(urls)
     write_robots()
     write_cname()
+
+    # Persist URLs only after a complete successful static build.
+    htseo_save_stable_urls(htseo_url_history)
 
     # Яндекс.Вебмастер — подтверждение прав на catalog.horizontriel.com
     yandex_verify_path = os.path.join(
