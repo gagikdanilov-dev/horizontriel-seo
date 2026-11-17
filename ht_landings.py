@@ -12,13 +12,15 @@ import json
 import re
 from urllib.parse import urlencode
 
-BRAND = 'ГоризонТРиел'
+from config import BRAND
+
+
 CAMPAIGNS = [
     {
         'type': 'Квартира', 'slug': 'podbor-kvartir',
         'label': 'Квартиры', 'eyebrow': 'КВАРТИРЫ · КАВКАЗСКИЕ МИНЕРАЛЬНЫЕ ВОДЫ',
         'title': 'Подберём квартиру в Кисловодске и на КМВ',
-        'page_title': 'Подбор квартиры в Кисловодске и на КМВ | ГоризонТРиел',
+        'page_title': f'Подбор квартиры в Кисловодске и на КМВ | {BRAND}',
         'description': 'Подбор квартиры в Кисловодске и городах КМВ по бюджету, планировке и району. Сравним актуальные предложения и поможем проверить документы.',
         'lead': 'Не нужно просматривать сотни вариантов. Начнём с вашего бюджета и сценария покупки: для жизни, переезда или инвестиций. Подготовим короткий список актуальных квартир с понятными условиями.',
         'hero_bottom': 'Район · планировка · состояние · юридическая проверка',
@@ -40,7 +42,7 @@ CAMPAIGNS = [
         'type': 'Дом', 'slug': 'podbor-domov',
         'label': 'Дома', 'eyebrow': 'ДОМА И КОТТЕДЖИ · КМВ',
         'title': 'Дом на КМВ — с понятными условиями покупки',
-        'page_title': 'Подбор дома в Кисловодске и на КМВ | ГоризонТРиел',
+        'page_title': f'Подбор дома в Кисловодске и на КМВ | {BRAND}',
         'description': 'Подберём дом в Кисловодске, Ессентуках и на КМВ. Сопоставим участок, подъезд, коммуникации, состояние здания и документы.',
         'lead': 'Красивый фасад — только начало. Поможем сравнить реальные дома по участку, конструктиву, коммуникациям, подъезду и юридическим условиям, чтобы после покупки не появились неприятные сюрпризы.',
         'hero_bottom': 'Участок · коммуникации · подъезд · состояние дома',
@@ -62,7 +64,7 @@ CAMPAIGNS = [
         'type': 'Земля', 'slug': 'podbor-uchastkov',
         'label': 'Участки', 'eyebrow': 'ЗЕМЕЛЬНЫЕ УЧАСТКИ · КМВ',
         'title': 'Найдём участок для строительства на КМВ',
-        'page_title': 'Подбор земельного участка в Кисловодске и на КМВ | ГоризонТРиел',
+        'page_title': f'Подбор земельного участка в Кисловодске и на КМВ | {BRAND}',
         'description': 'Подбор участков под строительство в Кисловодске и на КМВ: назначение земли, подъезд, коммуникации, границы и рельеф.',
         'lead': 'Для участка критичны документы, разрешённое использование, рельеф и подключение коммуникаций. Подберём предложения под вашу задачу и поможем определить, что проверить до сделки.',
         'hero_bottom': 'Назначение земли · границы · рельеф · коммуникации',
@@ -84,7 +86,7 @@ CAMPAIGNS = [
         'type': 'Коммерция', 'slug': 'podbor-kommercheskoy',
         'label': 'Коммерция', 'eyebrow': 'КОММЕРЧЕСКАЯ НЕДВИЖИМОСТЬ · КМВ',
         'title': 'Подберём помещение под ваш бизнес',
-        'page_title': 'Подбор коммерческой недвижимости на КМВ | ГоризонТРиел',
+        'page_title': f'Подбор коммерческой недвижимости на КМВ | {BRAND}',
         'description': 'Подбор коммерческой недвижимости на КМВ: помещения под офис, торговлю и услуги. Сравним назначение, локацию, входную группу и условия сделки.',
         'lead': 'Помещение должно работать на вашу бизнес-модель. Сопоставим локацию, вход, планировку, назначение, технические возможности и общую стоимость владения, а не только цену квадратного метра.',
         'hero_bottom': 'Назначение · доступ · трафик · инженерия',
@@ -147,6 +149,7 @@ def render(obj, selected, C, settings):
     base = C.SITE_BASE.rstrip('/')
     canonical = f'{base}/lp/{slug}/'
     target = C.MAIN_SITE.rstrip('/')
+    brand = e(BRAND)
     # Preserve the landing marker even if the visitor has JavaScript disabled.
     # The main Tilda form already records utm_content in PocketBase leads.source.
     lead_url = target + '/?' + urlencode({'ht_lp': slug, 'utm_content': 'lp_' + slug}) + '#contact'
@@ -196,9 +199,9 @@ def render(obj, selected, C, settings):
     footer_email = e(settings.get('email') or 'horizontriel@gmail.com')
     html = f'''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(obj['page_title'])}</title><meta name="description" content="{e(site_desc)}"><meta name="robots" content="{robots}">
-<link rel="canonical" href="{e(canonical)}"><meta property="og:type" content="website"><meta property="og:locale" content="ru_RU"><meta property="og:site_name" content="{BRAND}"><meta property="og:title" content="{e(obj['page_title'])}"><meta property="og:description" content="{e(site_desc)}"><meta property="og:url" content="{e(canonical)}">
+<link rel="canonical" href="{e(canonical)}"><meta property="og:type" content="website"><meta property="og:locale" content="ru_RU"><meta property="og:site_name" content="{brand}"><meta property="og:title" content="{e(obj['page_title'])}"><meta property="og:description" content="{e(site_desc)}"><meta property="og:url" content="{e(canonical)}">
 <meta name="theme-color" content="#12201e"><style>{CSS}</style><script type="application/ld+json">{ld_json}</script></head>
-<body><header><div class="bar wrap"><a class="brand" href="{e(target)}/" aria-label="ГоризонТРиел — на главную">ГоризонТРиел</a><nav class="nav" aria-label="Основная навигация"><a href="{e(inventory_url)}">Каталог объектов</a><a href="#kak-rabotaem">Как работаем</a><a href="{e(tel_url)}">{e(tel)}</a></nav></div></header>
+<body><header><div class="bar wrap"><a class="brand" href="{e(target)}/" aria-label="{brand} — на главную">{brand}</a><nav class="nav" aria-label="Основная навигация"><a href="{e(inventory_url)}">Каталог объектов</a><a href="#kak-rabotaem">Как работаем</a><a href="{e(tel_url)}">{e(tel)}</a></nav></div></header>
 <main><section class="hero"><div class="wrap hero-grid"><div><div class="kicker">{e(obj['eyebrow'])}</div><h1>{e(obj['title'])}</h1><p>{e(obj['lead'])}</p><div class="actions"><a class="btn gold" href="{e(lead_url)}" data-ht-event="lead">Получить подборку объектов</a><a class="btn ghost" href="{e(inventory_url)}" data-ht-event="catalog">Посмотреть предложения</a></div><div class="sublabel">{e(obj['hero_bottom'])}</div></div>
 <aside class="hero-panel"><div class="small-caps">Актуальный каталог</div><h2>{e(obj['label'])} на КМВ</h2><p>{e(inventory)}</p><p>Предложения берём из действующего каталога. Доступность уточняется перед просмотром.</p><a class="btn gold" href="{e(inventory_url)}">Открыть каталог</a></aside></div></section>
 <section><div class="wrap"><div class="small-caps">Подбор по вашим критериям</div><h2>На что обращаем внимание</h2><p class="section-sub">{e(obj['intro'])}</p><div class="three">{benefits}</div></div></section>
@@ -206,7 +209,7 @@ def render(obj, selected, C, settings):
 <section id="kak-rabotaem"><div class="wrap"><div class="small-caps">Три понятных шага</div><h2>От запроса до просмотра</h2><div class="steps">{step_html}</div></div></section>
 <section class="muted"><div class="wrap questions"><div class="small-caps">Ответы перед покупкой</div><h2>Частые вопросы</h2>{faqs}</div></section>
 <section class="callout" id="svyaz"><div class="wrap"><div class="small-caps">Подбор недвижимости</div><h2>Расскажите, какой объект ищете</h2><p>Город, бюджет и два-три важных критерия — этого достаточно, чтобы начать разговор. Никаких обязательств до обсуждения условий.</p><div class="actions"><a class="btn gold" href="{e(lead_url)}" data-ht-event="lead">Оставить заявку</a><a class="btn ghost" href="{e(tel_url)}" data-ht-event="phone">Позвонить: {e(tel)}</a></div></div></section></main>
-<footer><div class="wrap foot"><div>© {date.today().year} ГоризонТРиел. Недвижимость на КМВ.<br>Информация не является публичной офертой.</div><div><a href="{e(target)}/">Главный сайт</a> · <a href="{e(inventory_url)}">{e(obj['label'])}</a> · <a href="mailto:{footer_email}">{footer_email}</a></div></div></footer>
+<footer><div class="wrap foot"><div>© {date.today().year} {brand}. Недвижимость на КМВ.<br>Информация не является публичной офертой.</div><div><a href="{e(target)}/">Главный сайт</a> · <a href="{e(inventory_url)}">{e(obj['label'])}</a> · <a href="mailto:{footer_email}">{footer_email}</a></div></div></footer>
 <script>(function(m,d,t,u,i,k,a){{m[i]=m[i]||function(){{(m[i].a=m[i].a||[]).push(arguments)}};m[i].l=1*new Date();k=d.createElement(t),a=d.getElementsByTagName(t)[0];k.async=1;k.src=u;a.parentNode.insertBefore(k,a)}})(window,document,'script','https://mc.yandex.ru/metrika/tag.js','ym');ym(110255493,'init',{{clickmap:true,trackLinks:true,accurateTrackBounce:true}});</script>
 <script>(function(){{var keep=['utm_source','utm_medium','utm_campaign','utm_term','utm_content','yclid'];document.querySelectorAll('a[data-ht-event]').forEach(function(a){{if(a.dataset.htEvent==='lead'){{try{{var u=new URL(a.href);var incoming=new URLSearchParams(location.search);keep.forEach(function(k){{if(incoming.has(k))u.searchParams.set(k,incoming.get(k))}});var marker='lp_{slug}';var content=(u.searchParams.get('utm_content')||'').trim();if(content!==marker && !content.endsWith('__'+marker)){{var prefix=content.slice(0,Math.max(0,80-marker.length-2));u.searchParams.set('utm_content',prefix?prefix+'__'+marker:marker)}}a.href=u.toString()}}catch(_e){{}}}}a.addEventListener('click',function(){{try{{ym(110255493,'reachGoal','ht_landing_click',{{section:'{slug}',action:a.dataset.htEvent}})}}catch(_e){{}}}})}})}})();</script>
 </body></html>'''
