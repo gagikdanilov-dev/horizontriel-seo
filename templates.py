@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""HTML-шаблоны генератора. Визуально повторяют главный сайт HorizonTriel."""
+"""HTML-шаблоны генератора в стиле главного сайта «ГоризонТРиел»."""
 
 import html as _html
 import json
@@ -49,7 +49,6 @@ img{max-width:100%;display:block}
 /* nav */
 nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;height:64px;padding:0 5vw;background:rgba(245,241,235,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(200,191,176,.4)}
 .brand{font-family:var(--serif);font-size:1.5rem;letter-spacing:.02em;color:var(--ink)}
-.brand b{color:var(--gold);font-weight:600}
 .nav-links{display:flex;gap:1.5rem;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-mid)}
 .nav-links a:hover{color:var(--gold)}
 @media(max-width:720px){.nav-links{display:none}}
@@ -274,7 +273,7 @@ def page(
 <link rel="canonical" href="{esc_attr(canonical)}">
 <link rel="alternate" hreflang="ru-RU" href="{esc_attr(canonical)}">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="{BRAND}">
+<meta property="og:site_name" content="{esc_attr(BRAND)}">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:title" content="{esc_attr(title)}">
 <meta property="og:description" content="{esc_attr(description)}">
@@ -290,7 +289,7 @@ def page(
 </head>
 <body>
 <nav>
-  <a class="brand" href="{MAIN_SITE}/">Horizon<b>Triel</b></a>
+  <a class="brand" href="{MAIN_SITE}/">{esc(BRAND)}</a>
   <div class="nav-links">
     <a href="{MAIN_SITE}/#catalog">Каталог</a>
     <a href="{MAIN_SITE}/#process">Как работаем</a>
@@ -505,7 +504,7 @@ def footer(settings, seo_links):
 <footer>
   <div class="foot">
     <div>
-      <a class="brand" href="{MAIN_SITE}/">Horizon<b>Triel</b></a>
+      <a class="brand" href="{MAIN_SITE}/">{esc(BRAND)}</a>
       <p>Подбор, покупка и продажа недвижимости в Ставропольском крае и на Кавказских Минеральных Водах — квартиры, дома, участки, гаражи и коммерческие объекты. Помогаем с продажей коммерческой недвижимости.</p>
     </div>
     <div>
@@ -521,5 +520,5 @@ def footer(settings, seo_links):
       <div class="foot-links">{links_html}</div>
     </div>
   </div>
-  <div class="copy">© {BRAND}. Недвижимость в Ставропольском крае и на КМВ: покупка и продажа жилой и коммерческой недвижимости. Информация на сайте не является публичной офертой.</div>
+  <div class="copy">© {esc(BRAND)}. Недвижимость в Ставропольском крае и на КМВ: покупка и продажа жилой и коммерческой недвижимости. Информация на сайте не является публичной офертой.</div>
 </footer>"""

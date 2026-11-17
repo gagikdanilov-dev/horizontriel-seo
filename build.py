@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Генератор статических SEO-страниц HorizonTriel.
+Генератор статических SEO-страниц «ГоризонТРиел».
 
 SEO-стратегия:
   • главный брендовый сайт: https://horizontriel.com/
-  • catalog.horizontriel.com/ — рабочий каталог, но его КОРЕНЬ noindex
-  • индексируются страницы объектов, типов, городов и региона
+  • catalog.horizontriel.com/ — индексируемый хаб каталога со своим canonical
+  • в sitemap входят хаб, страницы объектов и непустые тематические страницы
   • SEO-география: Ставропольский край / КМВ
-  • в sitemap НЕ добавляется корень catalog.horizontriel.com/
 
 Запуск локально на тестовых данных:
     python build.py --sample
@@ -87,7 +86,7 @@ def fetch_settings():
         rec = {}
 
     return {
-        # Основной номер HorizonTriel задаём централизованно в config.py.
+        # Основной номер агентства задаём централизованно в config.py.
         # Так старое значение в PocketBase site_settings не вернёт старый телефон на SEO-страницы.
         "tel": C.FALLBACK_SETTINGS["tel"],
         "wa": C.FALLBACK_SETTINGS["wa"],
@@ -918,7 +917,7 @@ _hub_seo_links_cache = []
 
 def main_catalog_url(*, city="", ttype="", region=""):
     """
-    Ссылка на основной каталог HorizonTriel с фильтрами в hash.
+    Ссылка на основной каталог с фильтрами в hash.
     Hash не создаёт отдельную индексируемую URL-страницу.
     MAIN CATALOG ROUTER v3 на Tilda применит фильтр и очистит hash до #catalog.
     """
@@ -963,7 +962,7 @@ def main_catalog_jump(kind, key):
     return (
         '<div class="main-catalog-jump">'
         '<div class="txt">'
-        '<b>Открыть объекты в основном каталоге ГоризонТРиел</b>'
+        f'<b>Открыть объекты в основном каталоге {esc(C.BRAND)}</b>'
         'Фильтр по городу и типу будет выбран автоматически. '
         'Все объекты открываются в основном каталоге horizontriel.com.'
         '</div>'
@@ -1231,10 +1230,7 @@ def render_hub(
     by_region,
     settings
 ):
-    """
-    Корень catalog.horizontriel.com/ остаётся доступным людям,
-    но НЕ индексируется Google и canonical указывает на главный сайт.
-    """
+    """Корень SEO-каталога индексируется с canonical на собственный URL."""
     seo_title = (
         "Каталог недвижимости в Ставропольском крае"
         f" | {C.BRAND}"
@@ -1517,8 +1513,7 @@ def write_sitemap(urls):
 
 
 def write_robots():
-    # Корень каталога намеренно НЕ запрещаем через robots.txt:
-    # Google должен иметь возможность увидеть meta robots=noindex.
+    # Разрешаем обход каталога, включая страницы с meta robots=noindex.
     txt = (
         "User-agent: *\n"
         "Allow: /\n\n"
@@ -2656,9 +2651,8 @@ def build():
         f" | город×тип: {len(by_city_type)}"
     )
     print(
-        "• корень catalog.horizontriel.com/: "
-        "noindex, follow; canonical -> "
-        f"{C.MAIN_SITE}/"
+        f"• корень {C.SITE_BASE}/: "
+        f"index, follow; canonical -> {C.SITE_BASE}/"
     )
     print(
         f"• готово -> {C.OUT_DIR}/ "
