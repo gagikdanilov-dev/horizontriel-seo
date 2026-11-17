@@ -3,7 +3,7 @@ name: Build & Deploy SEO pages
 on:
   push:
     branches: [ main ]
-    paths: [ "build.py", "templates.py", "config.py", ".github/workflows/build.yml" ]
+    paths: [ "build.py", "templates.py", "config.py", "ht_landings.py", ".github/workflows/build.yml" ]
   schedule:
     - cron: "0 */6 * * *"
   workflow_dispatch: {}

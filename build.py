@@ -963,7 +963,7 @@ def main_catalog_jump(kind, key):
     return (
         '<div class="main-catalog-jump">'
         '<div class="txt">'
-        '<b>Открыть объекты в основном каталоге HorizonTriel</b>'
+        '<b>Открыть объекты в основном каталоге ГоризонТРиел</b>'
         'Фильтр по городу и типу будет выбран автоматически. '
         'Все объекты открываются в основном каталоге horizontriel.com.'
         '</div>'
@@ -2589,6 +2589,10 @@ def build():
             index=not empty,
         )
 
+    # HT_BRAND_LANDINGS_V1
+    from ht_landings import build_landings
+    landing_urls = build_landings(C, objs, settings, write_page)
+    urls.extend(landing_urls)
     write_sitemap(urls)
     write_robots()
     write_cname()

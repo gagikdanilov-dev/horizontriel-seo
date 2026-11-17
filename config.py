@@ -23,7 +23,7 @@ MAIN_SITE = os.environ.get(
     "https://horizontriel.com"
 ).rstrip("/")
 
-BRAND = "HorizonTriel"
+BRAND = "ГоризонТРиел"
 OUT_DIR = os.environ.get("OUT_DIR", "dist")
 
 # ── Основной SEO-регион ──
