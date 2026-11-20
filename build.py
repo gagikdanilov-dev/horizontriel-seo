@@ -45,6 +45,8 @@ from templates import (
 )
 
 SAMPLE = "--sample" in sys.argv or os.environ.get("SAMPLE") == "1"
+ARI_APARTMENT_ID = "lb7ew70ulkkeumn"
+ARI_APARTMENT_DUPLICATE_ID = "td1mjlan7e488mj"
 
 
 # ─────────────────────────── загрузка данных ───────────────────────────
@@ -1454,6 +1456,21 @@ def write_page(
         )
 
 
+def render_listing_redirect(path):
+    destination = esc_attr(C.SITE_BASE + path)
+    return f'''<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,follow">
+<meta http-equiv="refresh" content="0; url={destination}">
+<link rel="canonical" href="{destination}">
+<title>Карточка квартиры</title>
+<p><a href="{destination}">Открыть карточку квартиры</a></p>
+</html>
+'''
+
+
 def write_sitemap(urls):
     body = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -1970,13 +1987,21 @@ def build():
         for r in raw
     ]
 
-    # Keep the established regional landing pages and their URLs. The geography
-    # directory and individual listing pages cover the complete published inventory.
-    objs = [o for o in all_objs if in_home_region(o)]
     # Read existing paths before clearing the static output; never change canonical
     # paths when a title is edited or extra placement categories are selected.
     htseo_url_history = htseo_load_stable_urls(all_objs)
     htseo_assign_stable_urls(all_objs, htseo_url_history)
+
+    # Both IDs identify the same apartment. Keep the listing displayed by Ari
+    # and retain the old URL for existing links, including after an unpublish.
+    ari_apartment = next((o for o in all_objs if o["id"] == ARI_APARTMENT_ID), None)
+    duplicate_path = htseo_url_history.get(ARI_APARTMENT_DUPLICATE_ID) if ari_apartment else None
+    if ari_apartment:
+        all_objs = [o for o in all_objs if o["id"] != ARI_APARTMENT_DUPLICATE_ID]
+
+    # Keep the established regional landing pages and their URLs. The geography
+    # directory and individual listing pages cover the complete published inventory.
+    objs = [o for o in all_objs if in_home_region(o)]
 
     print(
         f"• объектов опубликовано всего: "
@@ -2144,6 +2169,9 @@ def build():
     )
 
     # ── Объекты ──
+    if duplicate_path:
+        write_page(duplicate_path, render_listing_redirect(ari_apartment["url"]), urls, index=False)
+
     by_area = {}
     for obj in all_objs:
         by_area.setdefault(location(obj)[:2], []).append(obj)
