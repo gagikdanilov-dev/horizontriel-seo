@@ -2,6 +2,7 @@
 from collections import defaultdict
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -62,6 +63,72 @@ def catalog_jump(type_slug="", *, country=None, region=None, city=None):
     )
 
 
+ROOM_PRICE_CSS = """
+.room-prices{max-width:44rem;margin:2rem 0}
+.room-prices h2{scroll-margin-top:5rem}
+.room-prices table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.room-prices :is(th,td){padding:.55rem .4rem;text-align:right;border-bottom:1px solid var(--stone)}
+.room-prices tr>:first-child{text-align:left}
+.room-prices thead th{color:var(--ink-light);font-size:.85rem;font-weight:500}
+.room-prices a{text-decoration:underline;text-underline-offset:.18em;white-space:nowrap}
+.room-prices p{margin-top:.6rem;color:var(--ink-light);font-size:.85rem}
+"""
+
+
+def apartment_price_table(objs):
+    groups = {}
+    for obj in objs:
+        if str(obj.get("deal") or "").strip().casefold() != "продажа" or (obj.get("price") or 0) <= 0:
+            continue
+        rooms = re.fullmatch(r"([1-9][0-9]*)(?:\.0+)?", str(obj.get("rooms") or "").strip())
+        if rooms:
+            groups.setdefault(int(rooms[1]), []).append(obj)
+    if len(groups) < 2:
+        return ""
+
+    def price_link(obj):
+        millions, remainder = divmod(obj["price"], 1_000_000)
+        label = f"{millions},{remainder:06d}".rstrip("0").rstrip(",")
+        return (f'<a href="{esc_attr(obj["url"])}" '
+                f'aria-label="Открыть объявление за {label} млн ₽">{label}</a>')
+
+    rows = []
+    for rooms, offers in sorted(groups.items()):
+        lowest = min(offers, key=lambda obj: obj["price"])
+        highest = max(offers, key=lambda obj: obj["price"])
+        prices = price_link(lowest)
+        if lowest["price"] != highest["price"]:
+            prices += " – " + price_link(highest)
+        rows.append(f'<tr><th scope="row">{rooms}</th><td>{len(offers)}</td><td>{prices}</td></tr>')
+    return (
+        '<section class="room-prices" aria-labelledby="room-prices-title">'
+        '<h2 id="room-prices-title">Цены квартир по числу комнат</h2>'
+        '<table aria-labelledby="room-prices-title"><thead><tr>'
+        '<th scope="col">Комнат</th><th scope="col">Объявлений</th>'
+        '<th scope="col">Цена, млн ₽</th></tr></thead><tbody>'
+        + "".join(rows) + '</tbody></table>'
+        '<p>Учтены объявления о продаже с указанной ценой и числом комнат. '
+        'Нажмите на цену, чтобы открыть объявление.</p></section>'
+    )
+
+
+def add_apartment_prices(path, listings):
+    table = apartment_price_table(listings)
+    if not table:
+        return
+    # Regional and international pages have different templates but share a listing grid.
+    target = Path(C.OUT_DIR) / path.strip("/") / "index.html"
+    document = target.read_text(encoding="utf-8")
+    intro = '<div class="prose">'
+    grid = '<div class="grid">'
+    start = document.index(grid)
+    if intro in document[:start]:
+        start = document.index(intro)
+    document = document[:start] + table + document[start:]
+    document = document.replace("</head>", "<style>" + ROOM_PRICE_CSS + "</style></head>", 1)
+    target.write_text(document, encoding="utf-8")
+
+
 def build_directory(objects, local_paths, write_page, urls):
     # Keep different countries and regions distinct even when their city names match.
     groups = defaultdict(list)
@@ -104,6 +171,8 @@ def build_directory(objects, local_paths, write_page, urls):
                         + "".join(card(row) for row in rows) + '</div></div>')
                 write_page(path, page(title=heading + " | " + C.BRAND, description=intro + " " + heading,
                                       canonical=C.SITE_BASE + path, body=body), urls)
+            if kind == "Квартира":
+                add_apartment_prices(path, rows)
             entries.append({"area": area, "city": city, "path": path, "count": len(rows)})
         entries.sort(key=lambda e: (e["area"].casefold(), e["city"].casefold(), e["path"]))
         feed[category] = entries
