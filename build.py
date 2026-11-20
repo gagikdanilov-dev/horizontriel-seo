@@ -25,6 +25,7 @@ from datetime import date
 from urllib.parse import urlparse, quote
 
 import config as C
+from geography import DIRECTORY, build_directory, in_home_region, listing_types, location
 from config import (
     slugify,
     type_meta,
@@ -59,7 +60,7 @@ def _get_json(url):
 
 def fetch_listings():
     fields = (
-        "id,title,type,tag,region,city,address,description,residential_complex,"
+        "id,title,type,additional_types,tag,country,region,city,address,description,residential_complex,"
         "completion_date,promotion,price,area,living_area,kitchen_area,year,floor,"
         "floors,rooms,land,land_purpose,plot_frontage,wall_material,communications,"
         "condition,deal,published,featured,sort_order,features,images,floorplans,"
@@ -67,11 +68,18 @@ def fetch_listings():
     )
     url = (
         f"{C.PB_URL}/api/collections/{C.PB_COLLECTION}/records"
-        f"?filter=(published=true)&sort=sort_order,created"
+        f"?filter=(published=true)&sort=sort_order,created,id"
         f"&perPage=500&fields={quote(fields)}"
     )
-    data = _get_json(url)
-    return data.get("items") or data.get("records") or []
+    rows = {}
+    page_number = 1
+    while True:
+        data = _get_json(f"{url}&page={page_number}")
+        for record in data.get("items", data.get("records", [])):
+            rows[record["id"]] = record
+        if page_number >= int(data.get("totalPages", 1)):
+            return list(rows.values())
+        page_number += 1
 
 
 def fetch_settings():
@@ -152,6 +160,8 @@ def normalize(r):
         "type": r.get("type"),
         "tag": r.get("tag"),
         "region": r.get("region"),
+        "country": r.get("country"),
+        "additional_types": r.get("additional_types") or [],
         "city": canonical_city(r.get("city")),
         "address": r.get("address"),
         "desc": r.get("description"),
@@ -754,7 +764,9 @@ def render_object(o, settings, similar):
         )
     ]
 
-    if o.get("city"):
+    if not in_home_region(o):
+        crumbs.append(("География каталога", C.SITE_BASE + DIRECTORY))
+    elif o.get("city"):
         crumbs.append(
             (
                 o["city"],
@@ -763,7 +775,7 @@ def render_object(o, settings, similar):
             )
         )
 
-    if o.get("type"):
+    if in_home_region(o) and o.get("type"):
         crumbs.append(
             (
                 tmeta["plural"],
@@ -805,10 +817,8 @@ def render_object(o, settings, similar):
         )
         + f'<h1>{esc(o.get("title") or "Объект недвижимости")}</h1>'
         + price_row
-        + main_catalog_jump(
-            "city_type",
-            (o.get("city") or "", o.get("type") or "")
-        )
+        + (main_catalog_jump("city_type", (o.get("city") or "", o.get("type") or ""))
+           if in_home_region(o) else "")
         + params
         + promo
         + desc
@@ -845,7 +855,8 @@ def render_object(o, settings, similar):
         )[:12],
         "address": {
             "@type": "PostalAddress",
-            "addressCountry": "RU",
+            **({"addressCountry": o["country"]} if o.get("country") else
+               {"addressCountry": "RU"} if in_home_region(o) else {}),
             "addressRegion": (
                 o.get("region")
                 or ""
@@ -1999,31 +2010,13 @@ def build():
         for r in raw
     ]
 
-    # КЛЮЧЕВО:
-    # SEO-каталог строим только по Ставропольскому краю.
-    objs = [
-        o
-        for o in all_objs
-        if str(
-            o.get("region")
-            or ""
-        ).strip().casefold()
-        == str(
-            C.SEO_REGION
-        ).strip().casefold()
-    ]
-
-    skipped = (
-        len(all_objs)
-        - len(objs)
-    )
-
-    for o in objs:
-        o["city"] = canonical_city(o.get("city"))
+    # Keep the established regional landing pages and their URLs. The geography
+    # directory and individual listing pages cover the complete published inventory.
+    objs = [o for o in all_objs if in_home_region(o)]
     # Read existing paths before clearing the static output; never change canonical
     # paths when a title is edited or extra placement categories are selected.
-    htseo_url_history = htseo_load_stable_urls(objs)
-    htseo_assign_stable_urls(objs, htseo_url_history)
+    htseo_url_history = htseo_load_stable_urls(all_objs)
+    htseo_assign_stable_urls(all_objs, htseo_url_history)
 
     print(
         f"• объектов опубликовано всего: "
@@ -2034,13 +2027,6 @@ def build():
         f"«{C.SEO_REGION}»: "
         f"{len(objs)}"
     )
-
-    if skipped:
-        print(
-            f"• исключено объектов "
-            f"из других регионов: "
-            f"{skipped}"
-        )
 
     by_type = {}
     by_city = {}
@@ -2066,17 +2052,12 @@ def build():
                 []
             ).append(o)
 
-        if (
-            o.get("city")
-            and o.get("type")
-        ):
-            by_city_type.setdefault(
-                (
-                    o["city"],
-                    o["type"]
-                ),
-                []
-            ).append(o)
+        if o.get("city"):
+            kinds = listing_types(o)
+            if o.get("type"):
+                kinds.add(o["type"])
+            for kind in sorted(kinds):
+                by_city_type.setdefault((o["city"], kind), []).append(o)
 
     # Приоритетные направления существуют всегда.
     for t in C.PRIORITY_TYPES:
@@ -2203,10 +2184,14 @@ def build():
     )
 
     # ── Объекты ──
-    for o in objs:
+    by_area = {}
+    for obj in all_objs:
+        by_area.setdefault(location(obj)[:2], []).append(obj)
+
+    for o in all_objs:
         similar = [
             s
-            for s in objs
+            for s in by_area[location(o)[:2]]
             if s["id"] != o["id"]
             and (
                 s.get("city")
@@ -2452,6 +2437,7 @@ def build():
         )
 
     # ── Город × тип ──
+    local_paths = {}
     for (c, t), v in by_city_type.items():
         tm = type_meta(t)
         empty = not v
@@ -2583,6 +2569,12 @@ def build():
             urls,
             index=not empty,
         )
+
+        if v:
+            path = f'/gorod/{slugify(c)}/{tm["slug"]}/'
+            local_paths[path] = {obj["id"] for obj in v}
+
+    build_directory(all_objs, local_paths, write_page, urls)
 
     # HT_BRAND_LANDINGS_V1
     from ht_landings import build_landings
