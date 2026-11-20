@@ -51,7 +51,11 @@ nav{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-con
 .brand{font-family:var(--serif);font-size:1.5rem;letter-spacing:.02em;color:var(--ink)}
 .nav-links{display:flex;gap:1.5rem;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-mid)}
 .nav-links a:hover{color:var(--gold)}
-@media(max-width:720px){.nav-links{display:none}}
+@media(max-width:720px){
+  nav{position:static;height:auto;align-items:flex-start;flex-direction:column;padding-block:.5rem}
+  .nav-links{flex-wrap:wrap;gap:0 1rem;font-size:.78rem}
+  .nav-links a{display:inline-flex;align-items:center;min-height:44px}
+}
 
 /* breadcrumb */
 .crumbs{padding:1.25rem 0 0;font-size:.82rem;color:var(--ink-light)}
@@ -288,10 +292,11 @@ def page(
 {json_ld(jsonld or [])}
 </head>
 <body>
-<nav>
+<nav aria-label="Основная навигация">
   <a class="brand" href="{MAIN_SITE}/">{esc(BRAND)}</a>
   <div class="nav-links">
     <a href="{MAIN_SITE}/#catalog">Каталог</a>
+    <a href="{SITE_BASE}/geografiya/">По городам</a>
     <a href="{MAIN_SITE}/#process">Как работаем</a>
     <a href="{MAIN_SITE}/#calc">Ипотека</a>
     <a href="{MAIN_SITE}/#contact">Контакты</a>
