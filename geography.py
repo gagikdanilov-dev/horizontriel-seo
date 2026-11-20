@@ -3,6 +3,7 @@ from collections import defaultdict
 from hashlib import sha256
 import json
 from pathlib import Path
+from urllib.parse import urlencode
 
 import config as C
 from templates import breadcrumbs_html, card, esc, esc_attr, page
@@ -46,6 +47,21 @@ def in_home_region(obj):
     return country == "Россия" and region.casefold() == C.SEO_REGION.casefold()
 
 
+def catalog_jump(type_slug="", *, country=None, region=None, city=None):
+    query = {key: value for key, value in (
+        ("geo_country", country), ("geo_region", region), ("geo_city", city)
+    ) if value is not None}
+    if type_slug:
+        query["type"] = type_slug
+    href = C.MAIN_SITE + "/#catalog" + ("?" + urlencode(query) if query else "")
+    return (
+        '<div class="main-catalog-jump"><div class="txt">'
+        f'<b>Открыть объекты в основном каталоге {esc(C.BRAND)}</b>'
+        'Выбранные фильтры сохранятся при переходе.</div>'
+        f'<a class="go" href="{esc_attr(href)}">Смотреть объекты →</a></div>'
+    )
+
+
 def build_directory(objects, local_paths, write_page, urls):
     # Keep different countries and regions distinct even when their city names match.
     groups = defaultdict(list)
@@ -82,7 +98,9 @@ def build_directory(objects, local_paths, write_page, urls):
                 intro = f'Опубликованные предложения. Объектов в подборке: {len(rows)}.'
                 body = (breadcrumbs_html([("География каталога", DIRECTORY), (city, None)])
                         + '<div class="wrap section"><h1>' + esc(heading) + '</h1><p>'
-                        + esc(intro) + '</p><div class="grid">'
+                        + esc(intro) + '</p>'
+                        + catalog_jump(category, country=country, region=region, city=city)
+                        + '<div class="grid">'
                         + "".join(card(row) for row in rows) + '</div></div>')
                 write_page(path, page(title=heading + " | " + C.BRAND, description=intro + " " + heading,
                                       canonical=C.SITE_BASE + path, body=body), urls)

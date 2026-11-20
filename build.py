@@ -25,7 +25,7 @@ from datetime import date
 from urllib.parse import urlparse, quote
 
 import config as C
-from geography import DIRECTORY, build_directory, in_home_region, listing_types, location
+from geography import DIRECTORY, build_directory, catalog_jump, in_home_region, listing_types, location
 from config import (
     slugify,
     type_meta,
@@ -791,6 +791,7 @@ def render_object(o, settings, similar):
         )
     )
 
+    country, region, city = location(o)
     similar_html = ""
     if similar:
         similar_html = (
@@ -817,8 +818,8 @@ def render_object(o, settings, similar):
         )
         + f'<h1>{esc(o.get("title") or "Объект недвижимости")}</h1>'
         + price_row
-        + (main_catalog_jump("city_type", (o.get("city") or "", o.get("type") or ""))
-           if in_home_region(o) else "")
+        + catalog_jump(tmeta["slug"] if o.get("type") else "",
+                       country=country, region=region, city=city or None)
         + params
         + promo
         + desc
@@ -926,60 +927,19 @@ _hub_seo_links_cache = []
 
 
 
-def main_catalog_url(*, city="", ttype="", region=""):
-    """
-    Ссылка на основной каталог с фильтрами в hash.
-    Hash не создаёт отдельную индексируемую URL-страницу.
-    MAIN CATALOG ROUTER v3 на Tilda применит фильтр и очистит hash до #catalog.
-    """
-    parts = []
+def main_catalog_jump(kind, key, objs):
+    if kind == "type":
+        return catalog_jump(type_meta(key)["slug"])
+    country, region, _ = location(objs[0]) if objs else ("Россия", C.SEO_REGION, "")
+    if kind == "region":
+        return catalog_jump(country=country, region=key)
+    if kind in {"city", "city_type"}:
+        city, ttype = (key, "") if kind == "city" else key
+        city = location({"country": country, "region": region, "city": city})[2]
+        return catalog_jump(type_meta(ttype)["slug"] if ttype else "",
+                            country=country, region=region, city=city)
+    return catalog_jump()
 
-    if city:
-        parts.append("city=" + slugify(city))
-
-    if ttype:
-        parts.append("type=" + type_meta(ttype)["slug"])
-
-    if region:
-        parts.append("region=" + slugify(region))
-
-    suffix = ""
-    if parts:
-        suffix = "?" + "&".join(parts)
-
-    return C.MAIN_SITE + "/#catalog" + suffix
-
-
-def main_catalog_jump(kind, key):
-    city = ""
-    ttype = ""
-    region = ""
-
-    if kind == "city":
-        city = key or ""
-    elif kind == "type":
-        ttype = key or ""
-    elif kind == "region":
-        region = key or ""
-    elif kind == "city_type" and isinstance(key, (tuple, list)) and len(key) >= 2:
-        city, ttype = key[0], key[1]
-
-    href = main_catalog_url(
-        city=city,
-        ttype=ttype,
-        region=region
-    )
-
-    return (
-        '<div class="main-catalog-jump">'
-        '<div class="txt">'
-        f'<b>Открыть объекты в основном каталоге {esc(C.BRAND)}</b>'
-        'Фильтр по городу и типу будет выбран автоматически. '
-        'Все объекты открываются в основном каталоге horizontriel.com.'
-        '</div>'
-        f'<a class="go" href="{esc_attr(href)}">Смотреть объекты →</a>'
-        '</div>'
-    )
 
 def contact_cta(settings):
     tel_href = "".join(
@@ -1035,7 +995,7 @@ def render_cluster(
             f'Каталог · {esc(kind_label(kind))}'
             '</div>'
             f'<h1>{h1}</h1>'
-            + main_catalog_jump(kind, key)
+            + main_catalog_jump(kind, key, objs)
             + '<div class="prose">'
             '<p>В этой категории пока нет опубликованных объектов. '
             'Оставьте заявку — подберём подходящий вариант '
@@ -1114,7 +1074,7 @@ def render_cluster(
         f'Каталог · {esc(kind_label(kind))}'
         '</div>'
         f'<h1>{h1}</h1>'
-        + main_catalog_jump(kind, key)
+        + main_catalog_jump(kind, key, objs)
         + facts_row(st)
         + prose
         + grid
