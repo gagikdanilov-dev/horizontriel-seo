@@ -45,8 +45,11 @@ from templates import (
 )
 
 SAMPLE = "--sample" in sys.argv or os.environ.get("SAMPLE") == "1"
-ARI_APARTMENT_ID = "lb7ew70ulkkeumn"
-ARI_APARTMENT_DUPLICATE_ID = "td1mjlan7e488mj"
+LISTING_DUPLICATE_TARGETS = {
+    "td1mjlan7e488mj": "lb7ew70ulkkeumn",  # Марины Расковой, 2 — карточка Ари
+    "0cxd9z4axyj4vz6": "djte697t54e2jz1",  # Горького, 13
+    "1mqa9pfzp13znpc": "gbr18l3phlr02lx",  # Жуковского, 35
+}
 
 
 # ─────────────────────────── загрузка данных ───────────────────────────
@@ -1992,12 +1995,15 @@ def build():
     htseo_url_history = htseo_load_stable_urls(all_objs)
     htseo_assign_stable_urls(all_objs, htseo_url_history)
 
-    # Both IDs identify the same apartment. Keep the listing displayed by Ari
-    # and retain the old URL for existing links, including after an unpublish.
-    ari_apartment = next((o for o in all_objs if o["id"] == ARI_APARTMENT_ID), None)
-    duplicate_path = htseo_url_history.get(ARI_APARTMENT_DUPLICATE_ID) if ari_apartment else None
-    if ari_apartment:
-        all_objs = [o for o in all_objs if o["id"] != ARI_APARTMENT_DUPLICATE_ID]
+    # Collapse confirmed pairs only while their preferred listing is published.
+    # Keep the older URLs in the history so existing links continue to work.
+    published_urls = {o["id"]: o["url"] for o in all_objs}
+    duplicate_redirects = {
+        htseo_url_history[duplicate_id]: published_urls[target_id]
+        for duplicate_id, target_id in LISTING_DUPLICATE_TARGETS.items()
+        if duplicate_id in htseo_url_history and target_id in published_urls
+    }
+    all_objs = [o for o in all_objs if o["url"] not in duplicate_redirects]
 
     # Keep the established regional landing pages and their URLs. The geography
     # directory and individual listing pages cover the complete published inventory.
@@ -2169,8 +2175,8 @@ def build():
     )
 
     # ── Объекты ──
-    if duplicate_path:
-        write_page(duplicate_path, render_listing_redirect(ari_apartment["url"]), urls, index=False)
+    for duplicate_path, target_path in duplicate_redirects.items():
+        write_page(duplicate_path, render_listing_redirect(target_path), urls, index=False)
 
     by_area = {}
     for obj in all_objs:
