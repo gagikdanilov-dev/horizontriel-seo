@@ -471,21 +471,7 @@ def strip_tags(s):
 
 # ─────────────────────────── страница объекта ───────────────────────────
 
-def render_object(o, settings, similar):
-    url_abs = C.SITE_BASE + o["url"]
-    tmeta = type_meta(o.get("type"))
-
-    place = " · ".join(
-        [
-            x
-            for x in (
-                o.get("region"),
-                o.get("city")
-            )
-            if x
-        ]
-    )
-
+def object_metadata(o):
     title_bits = [
         o.get("title") or "Объект недвижимости"
     ]
@@ -549,6 +535,52 @@ def render_object(o, settings, similar):
         )
 
     seo_desc = ". ".join(d_bits)[:240]
+
+    return seo_title, seo_desc
+
+
+def distinct_object_metadata(objects):
+    metadata = {obj["id"]: list(object_metadata(obj)) for obj in objects}
+    for column in (0, 1):
+        groups = {}
+        for obj in objects:
+            value = metadata[obj["id"]][column]
+            groups.setdefault(value, []).append(obj)
+        for value, group in groups.items():
+            if len(group) < 2:
+                continue
+            for obj in group:
+                address = (obj.get("address") or "").strip()
+                unique_address = address and sum(
+                    (item.get("address") or "").strip() == address for item in group
+                ) == 1
+                if column == 0 and unique_address and address not in value:
+                    label = address
+                else:
+                    label = f'объект {obj["id"]}'
+                if column == 0:
+                    metadata[obj["id"]][0] = value.removesuffix(f" | {C.BRAND}") + f" — {label} | {C.BRAND}"
+                else:
+                    metadata[obj["id"]][1] = value[:238 - len(label)].rstrip(". ") + f". {label}."
+    return metadata
+
+
+def render_object(o, settings, similar, metadata=None):
+    url_abs = C.SITE_BASE + o["url"]
+    tmeta = type_meta(o.get("type"))
+
+    place = " · ".join(
+        [
+            x
+            for x in (
+                o.get("region"),
+                o.get("city")
+            )
+            if x
+        ]
+    )
+
+    seo_title, seo_desc = metadata or object_metadata(o)
 
     # Галерея
     imgs = o.get("images") or []
@@ -847,7 +879,7 @@ def render_object(o, settings, similar):
         ),
         "description": (
             o.get("desc")
-            or seo_desc
+            or object_metadata(o)[1]
         ),
         "url": url_abs,
         "datePosted": (
@@ -2178,6 +2210,7 @@ def build():
     for duplicate_path, target_path in duplicate_redirects.items():
         write_page(duplicate_path, render_listing_redirect(target_path), urls, index=False)
 
+    object_meta = distinct_object_metadata(all_objs)
     by_area = {}
     for obj in all_objs:
         by_area.setdefault(location(obj)[:2], []).append(obj)
@@ -2200,7 +2233,8 @@ def build():
             render_object(
                 o,
                 settings,
-                similar
+                similar,
+                object_meta[o["id"]],
             ),
             urls,
             lastmod=(
