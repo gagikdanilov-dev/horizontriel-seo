@@ -70,9 +70,48 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
-      - uses: actions/upload-pages-artifact@v3
+      # Use the same artifact client and current-run lookup as deploy-pages v4.
+      - name: Prepare the Pages artifact client
+        run: npm install --prefix "$RUNNER_TEMP/pages-client" --ignore-scripts --no-audit --no-fund @actions/artifact@2.1.3
+
+      - id: upload_pages
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+      - name: Verify the uploaded github-pages artifact in this run
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          UPLOADED_ARTIFACT_ID: ${{ steps.upload_pages.outputs.artifact_id }}
+        with:
+          script: |
+            const { DefaultArtifactClient } = require(
+              `${process.env.RUNNER_TEMP}/pages-client/node_modules/@actions/artifact`
+            );
+            const expected = process.env.UPLOADED_ARTIFACT_ID;
+            if (!/^[1-9]\d*$/.test(expected || '')) {
+              throw new Error('Upload did not return a valid artifact ID.');
+            }
+
+            const client = new DefaultArtifactClient();
+            async function findPages() {
+              const { artifacts } = await client.listArtifacts();
+              return artifacts.filter(artifact => artifact.name === 'github-pages');
+            }
+
+            let matches = await findPages();
+            if (matches.length === 0) {
+              core.info('github-pages is not visible in this run; checking once more in 10 seconds.');
+              await new Promise(resolve => setTimeout(resolve, 10_000));
+              matches = await findPages();
+            }
+            if (matches.length !== 1 || String(matches[0].id) !== expected) {
+              throw new Error(
+                `Run ${context.runId}: expected exactly one github-pages artifact with ID ${expected}; ` +
+                `found ${matches.length} named matches (IDs: ${matches.map(a => a.id).join(', ') || 'none'}).`
+              );
+            }
+            core.info(`Run ${context.runId}: verified github-pages artifact ${expected}.`);
 
       - id: deploy
         uses: actions/deploy-pages@v4
