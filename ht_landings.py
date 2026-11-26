@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Four distinct, one-page service landings for ГоризонТРиел.
+"""Four distinct, one-page regional service landings for Horizontriel.
 
 Called by the existing SEO generator only after stable object URLs are loaded.
 Never changes PocketBase, existing listing URLs, CNAME, or other pages.
@@ -12,7 +12,9 @@ import json
 import re
 from urllib.parse import urlencode
 
-from config import BRAND
+from config import BRAND, fmt_price_plain
+from listing_contract import newest_first
+from templates import listing_date_html
 
 
 CAMPAIGNS = [
@@ -129,6 +131,7 @@ section{padding:78px 0}.section-sub{max-width:810px;color:var(--ink2);font-size:
 .questions{max-width:930px}details{background:#fff;border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:10px}summary{cursor:pointer;font-weight:650}details p{color:var(--ink2);margin-bottom:1px}
 .callout{padding:50px 0 65px;background:#172923;color:#fff}.callout h2{color:#fff}.callout p{color:#cad3cb;max-width:750px}footer{background:#101b18;color:#b8c3ba;padding:28px 0;font-size:.85rem}footer a{color:inherit}.foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
 .small-caps{letter-spacing:.12em;text-transform:uppercase;font-size:.76rem;color:#997749;font-weight:750}
+.listing-date{display:block;font-size:.82rem;color:#526159;margin:.6rem 0}
 @media(max-width:850px){.hero-grid{grid-template-columns:1fr;gap:25px}.hero{padding:55px 0}.three,.offers{grid-template-columns:repeat(2,minmax(0,1fr))}.steps{grid-template-columns:1fr}.nav a:nth-child(2){display:none}}
 @media(max-width:600px){.wrap{width:min(100% - 28px,1180px)}section{padding:48px 0}.bar{min-height:68px}.nav{gap:8px}.nav a:not(:last-child){display:none}.three,.offers{grid-template-columns:1fr}.hero-panel{padding:20px}.btn{width:100%}.offer-copy h3{min-height:0}.actions{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn,.offer{transition:none}}
@@ -145,6 +148,7 @@ def valid_phone(raw):
 
 
 def render(obj, selected, C, settings):
+    selected = newest_first(selected)
     slug = obj['slug']
     base = C.SITE_BASE.rstrip('/')
     canonical = f'{base}/lp/{slug}/'
@@ -166,11 +170,10 @@ def render(obj, selected, C, settings):
                  if img_src and str(img_src).startswith('https://') else '<div class="photo" aria-hidden="true"></div>')
         city = e(item.get('city') or 'КМВ')
         title = e(item.get('title') or obj['label'])
-        price = int(item.get('price') or 0)
-        price_html = f'<div class="price">{price:,.0f} ₽</div>'.replace(',', ' ') if price else '<div class="price">Цена по запросу</div>'
+        price_html = f'<div class="price">{e(fmt_price_plain(item.get("price"), item.get("currency")))}</div>'
         area = item.get('area')
         area_text = f' · {e(area)} м²' if area and obj['type'] != 'Земля' else ''
-        cards.append(f'<a class="offer" href="{e(link)}" aria-label="{title}: подробнее">{image}<div class="offer-copy"><span class="details">{city}{area_text}</span><h3>{title}</h3>{price_html}<span class="tagline">Смотреть объект →</span></div></a>')
+        cards.append(f'<a class="offer" href="{e(link)}" aria-label="{title}: подробнее">{image}<div class="offer-copy"><span class="details">{city}{area_text}</span><h3>{title}</h3>{price_html}{listing_date_html(item)}<span class="tagline">Смотреть объект →</span></div></a>')
     offers = ''.join(cards)
     if not offers:
         offers = f'<div class="tile">В каталоге пока нет опубликованных предложений этого типа. Оставьте запрос на подбор — обсудим вашу задачу и проверим доступные варианты.</div>'
@@ -224,7 +227,7 @@ def build_landings(C, objs, settings, write_page):
     result = []
     for spec in CAMPAIGNS:
         selected = [o for o in objs if o.get('type') == spec['type'] and o.get('id') and o.get('url')]
-        selected.sort(key=lambda o: (not bool(o.get('featured')), o.get('city') != 'Кисловодск', str(o.get('id'))))
+        selected = newest_first(selected)
         path = f"/lp/{spec['slug']}/"
         html = render(spec, selected, C, settings)
         write_page(path, html, result, index=bool(selected))

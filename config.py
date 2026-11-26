@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Конфигурация генератора статических SEO-страниц «ГоризонТРиел».
+Конфигурация генератора статических SEO-страниц Horizontriel.
 Всё, что нужно менять при переносе, — здесь.
 """
 import os
+from decimal import Decimal, InvalidOperation
 
 # ── Источник данных (PocketBase) ──
 PB_URL = os.environ.get("PB_URL", "https://api.horizontriel.com").rstrip("/")
@@ -23,8 +24,17 @@ MAIN_SITE = os.environ.get(
     "https://horizontriel.com"
 ).rstrip("/")
 
-BRAND = "ГоризонТРиел"
+BRAND = "Horizontriel"
 OUT_DIR = os.environ.get("OUT_DIR", "dist")
+
+COUNTRY_PAGES = {
+    "Кипр": "/cyprus", "Турция": "/turkey", "Дубай": "/dubai", "Испания": "/spain",
+}
+# Enable an exact path here only after its Tilda page is published and checked.
+# Before that, country navigation uses the existing main-site catalog router.
+# Keep this explicit and empty for the first SEO/vendor-assets deployment.
+PUBLISHED_COUNTRY_PAGES = frozenset()
+CURRENCY_LABELS = {"RUB": "₽", "EUR": "€", "USD": "USD", "AED": "AED", "TRY": "TRY"}
 
 # ── Основной SEO-регион ──
 SEO_REGION = "Ставропольский край"
@@ -234,20 +244,18 @@ def plural_ru(n, one, few, many):
     return many
 
 
-def fmt_price_plain(n):
-    n = int(n or 0)
-
-    if not n:
+def fmt_price_plain(n, currency=None):
+    """Display the stated amount without conversion or an assumed currency."""
+    try:
+        amount = Decimal(str(n or 0))
+    except InvalidOperation:
         return "Цена по запросу"
-
-    if n >= 1_000_000:
-        v = f"{n / 1_000_000:.1f}".rstrip("0").rstrip(".")
-        return f"{v} млн ₽"
-
-    if n >= 1000:
-        return f"{round(n / 1000):,}".replace(",", " ") + " тыс. ₽"
-
-    return f"{n:,}".replace(",", " ") + " ₽"
+    if not amount.is_finite() or amount <= 0:
+        return "Цена по запросу"
+    text = f"{amount:,.2f}".rstrip("0").rstrip(".")
+    text = text.replace(",", " ").replace(".", ",")
+    label = CURRENCY_LABELS.get(currency)
+    return f"{text} {label}" if label else f"{text} · валюта уточняется"
 
 
 def fmt_num(n):
