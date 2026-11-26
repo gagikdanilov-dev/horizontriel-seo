@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
-"""HTML-шаблоны генератора в стиле главного сайта «ГоризонТРиел»."""
+"""HTML-шаблоны генератора в стиле главного сайта Horizontriel."""
 
 import html as _html
 import json
+from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
-from config import BRAND, SITE_BASE, MAIN_SITE
+import config as C
+from config import BRAND, SITE_BASE, MAIN_SITE, COUNTRY_PAGES, fmt_price_plain
+from listing_contract import listing_date
 
 
 # Коды подтверждения прав в поисковиках.
@@ -227,7 +231,7 @@ def json_ld(objs):
                     o,
                     ensure_ascii=False,
                     separators=(",", ":")
-                )
+                ).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
                 + "</script>"
             )
 
@@ -288,7 +292,14 @@ def page(
 <meta name="twitter:description" content="{esc_attr(description)}">
 {tw_img}
 {FONTS}
-<style>{CSS}</style>
+<style>{CSS}
+.listing-date{{display:block;color:var(--ink-light);font-size:.82rem;margin:.6rem 0}}
+.object-videos{{margin-top:1.25rem;min-width:0}}
+.object-videos h2{{font-size:1.3rem;margin-bottom:1rem}}
+.object-videos video{{display:block;width:100%;max-height:34rem;background:#111;border-radius:.5rem;margin:0 0 1rem}}
+.country-links{{display:flex;flex-wrap:wrap;gap:.6rem;margin:1rem 0}}
+.country-links a{{display:inline-block;padding:.55rem .85rem;border:1px solid #c8bfae;border-radius:2rem;text-decoration:none}}
+</style>
 {json_ld(jsonld or [])}
 </head>
 <body>
@@ -345,48 +356,48 @@ def breadcrumbs_html(items):
     )
 
 
-def _price_card(n):
-    n = int(n or 0)
+def _price_card(n, currency=None):
+    return esc(fmt_price_plain(n, currency))
 
-    if not n:
-        return "Цена по запросу"
 
-    if n >= 1_000_000:
-        v = (
-            f"{n / 1_000_000:.1f}"
-            .rstrip("0")
-            .rstrip(".")
-        )
+def listing_date_html(obj):
+    stamp, label = listing_date(obj)
+    if stamp is None:
+        return ""
+    calendar_day = stamp.astimezone(ZoneInfo("Europe/Moscow"))
+    return (f'<time class="listing-date" datetime="{stamp.isoformat().replace("+00:00", "Z")}">'
+            f'{label}: {calendar_day:%d.%m.%Y}</time>')
 
-        return (
-            f"{v} млн <sub>₽</sub>"
-        )
 
-    if n >= 1000:
-        return (
-            f"{round(n / 1000):,}"
-            .replace(",", " ")
-            + " тыс. <sub>₽</sub>"
-        )
-
-    return (
-        f"{n:,}".replace(",", " ")
-        + " <sub>₽</sub>"
-    )
+def country_links():
+    links = [("Россия", MAIN_SITE + "/#catalog?geo_country=%D0%A0%D0%BE%D1%81%D1%81%D0%B8%D1%8F")]
+    for label, path in COUNTRY_PAGES.items():
+        if path in C.PUBLISHED_COUNTRY_PAGES:
+            destination = MAIN_SITE + path
+        else:
+            filters = {"geo_country": "ОАЭ" if label == "Дубай" else label}
+            if label == "Дубай":
+                filters["geo_city"] = "Дубай"
+            destination = MAIN_SITE + "/#catalog?" + urlencode(filters)
+        links.append((label, destination))
+    return ('<div class="country-links" role="navigation" aria-label="Недвижимость по странам">'
+            + ''.join(f'<a href="{esc_attr(url)}">{esc(label)}</a>' for label, url in links)
+            + '</div>')
 
 
 def card(obj):
     """Карточка объекта в сетке."""
 
     place = " · ".join(
-        [
+        dict.fromkeys([
             x
             for x in (
+                obj.get("country"),
                 obj.get("region"),
                 obj.get("city")
             )
             if x
-        ]
+        ])
     )
 
     alt = " — ".join(
@@ -481,8 +492,10 @@ def card(obj):
             if meta
             else ""
         )
-        + f'<div class="card-price">{_price_card(obj.get("price"))}</div>'
-        '</div></a>'
+        + f'<div class="card-price">{_price_card(obj.get("price"), obj.get("currency"))}</div>'
+        + listing_date_html(obj)
+        + ('<div class="card-meta">Есть видео</div>' if obj.get("videos") else '')
+        + '</div></a>'
     )
 
 
@@ -510,7 +523,8 @@ def footer(settings, seo_links):
   <div class="foot">
     <div>
       <a class="brand" href="{MAIN_SITE}/">{esc(BRAND)}</a>
-      <p>Подбор, покупка и продажа недвижимости в Ставропольском крае и на Кавказских Минеральных Водах — квартиры, дома, участки, гаражи и коммерческие объекты. Помогаем с продажей коммерческой недвижимости.</p>
+      <p>Подбор, покупка и продажа недвижимости в России и за рубежом — квартиры, дома, участки и коммерческие объекты. Выберите страну и подходящее направление.</p>
+      {country_links()}
     </div>
     <div>
       <h4>Связь</h4>
@@ -525,5 +539,5 @@ def footer(settings, seo_links):
       <div class="foot-links">{links_html}</div>
     </div>
   </div>
-  <div class="copy">© {esc(BRAND)}. Недвижимость в Ставропольском крае и на КМВ: покупка и продажа жилой и коммерческой недвижимости. Информация на сайте не является публичной офертой.</div>
+  <div class="copy">© {esc(BRAND)}. Покупка и продажа жилой и коммерческой недвижимости. Информация на сайте не является публичной офертой.</div>
 </footer>"""

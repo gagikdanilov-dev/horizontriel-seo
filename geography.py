@@ -7,7 +7,8 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 import config as C
-from templates import breadcrumbs_html, card, esc, esc_attr, page
+from templates import breadcrumbs_html, card, country_links, esc, esc_attr, page
+from listing_contract import country_for, newest_first
 
 
 DIRECTORY = "/geografiya/"
@@ -30,12 +31,8 @@ def location(obj):
     def clean(value):
         return " ".join(str(value or "").split())
 
-    country = clean(obj.get("country"))
+    country = country_for(obj)
     region = clean(obj.get("region"))
-    if country.casefold() in {"ru", "rus", "россия", "russia", "российская федерация"}:
-        country = "Россия"
-    if not country and region.casefold() == C.SEO_REGION.casefold():
-        country = "Россия"
     city = clean(obj.get("city"))
     if country == "Россия" and region.casefold() == C.SEO_REGION.casefold():
         if city.casefold() in {"пос. иноземцево", "посёлок иноземцево", "поселок иноземцево"}:
@@ -78,38 +75,42 @@ ROOM_PRICE_CSS = """
 def apartment_price_table(objs):
     groups = {}
     for obj in objs:
-        if str(obj.get("deal") or "").strip().casefold() != "продажа" or (obj.get("price") or 0) <= 0:
+        currency = obj.get("currency")
+        if currency not in C.CURRENCY_LABELS or str(obj.get("deal") or "").strip().casefold() != "продажа" or (obj.get("price") or 0) <= 0:
             continue
         rooms = re.fullmatch(r"([1-9][0-9]*)(?:\.0+)?", str(obj.get("rooms") or "").strip())
         if rooms:
-            groups.setdefault(int(rooms[1]), []).append(obj)
-    if len(groups) < 2:
+            groups.setdefault(currency, {}).setdefault(int(rooms[1]), []).append(obj)
+    if sum(len(room_groups) for room_groups in groups.values()) < 2:
         return ""
 
     def price_link(obj):
-        millions, remainder = divmod(obj["price"], 1_000_000)
-        label = f"{millions},{remainder:06d}".rstrip("0").rstrip(",")
+        label = C.fmt_price_plain(obj["price"], obj["currency"])
         return (f'<a href="{esc_attr(obj["url"])}" '
-                f'aria-label="Открыть объявление за {label} млн ₽">{label}</a>')
+                f'aria-label="Открыть объявление за {esc_attr(label)}">{esc(label)}</a>')
 
-    rows = []
-    for rooms, offers in sorted(groups.items()):
-        lowest = min(offers, key=lambda obj: obj["price"])
-        highest = max(offers, key=lambda obj: obj["price"])
-        prices = price_link(lowest)
-        if lowest["price"] != highest["price"]:
-            prices += " – " + price_link(highest)
-        rows.append(f'<tr><th scope="row">{rooms}</th><td>{len(offers)}</td><td>{prices}</td></tr>')
-    return (
-        '<section class="room-prices" aria-labelledby="room-prices-title">'
-        '<h2 id="room-prices-title">Цены квартир по числу комнат</h2>'
-        '<table aria-labelledby="room-prices-title"><thead><tr>'
-        '<th scope="col">Комнат</th><th scope="col">Объявлений</th>'
-        '<th scope="col">Цена, млн ₽</th></tr></thead><tbody>'
-        + "".join(rows) + '</tbody></table>'
-        '<p>Учтены объявления о продаже с указанной ценой и числом комнат. '
-        'Нажмите на цену, чтобы открыть объявление.</p></section>'
-    )
+    tables = []
+    for currency, room_groups in sorted(groups.items()):
+        rows = []
+        for rooms, offers in sorted(room_groups.items()):
+            lowest = min(offers, key=lambda obj: obj["price"])
+            highest = max(offers, key=lambda obj: obj["price"])
+            prices = price_link(lowest)
+            if lowest["price"] != highest["price"]:
+                prices += " – " + price_link(highest)
+            rows.append(f'<tr><th scope="row">{rooms}</th><td>{len(offers)}</td><td>{prices}</td></tr>')
+        heading_id = "room-prices-" + currency
+        tables.append(
+            f'<section class="room-prices" aria-labelledby="{heading_id}" data-currency="{currency}">'
+            f'<h2 id="{heading_id}">Цены квартир по числу комнат · {esc(currency)}</h2>'
+            f'<table aria-labelledby="{heading_id}"><thead><tr>'
+            '<th scope="col">Комнат</th><th scope="col">Объявлений</th>'
+            '<th scope="col">Цена</th></tr></thead><tbody>'
+            + "".join(rows) + '</tbody></table>'
+            '<p>Учтены объявления о продаже с указанной валютой, ценой и числом комнат. '
+            'Разные валюты показаны отдельно, без пересчёта. Нажмите на цену, чтобы открыть объявление.</p></section>'
+        )
+    return "".join(tables)
 
 
 def add_apartment_prices(path, listings):
@@ -150,6 +151,7 @@ def build_directory(objects, local_paths, write_page, urls):
         for (item_kind, identity), rows in groups.items():
             if item_kind != kind:
                 continue
+            rows = newest_first(rows)
             country, region, city = names[identity]
             area = " · ".join(dict.fromkeys(x for x in (country, region) if x))
             local_path = f'/gorod/{C.slugify(city)}/{category}/'
@@ -194,6 +196,7 @@ def build_directory(objects, local_paths, write_page, urls):
     title = "Недвижимость по городам и регионам"
     body = (breadcrumbs_html([("Каталог", "/"), ("География", None)])
             + '<main class="wrap section"><h1>' + title + '</h1>'
+            + country_links()
             + ''.join(sections) + '</main>')
     write_page(DIRECTORY, page(title=title + " | " + C.BRAND,
                                description="Выберите тип недвижимости и город, в котором есть опубликованные объекты.",

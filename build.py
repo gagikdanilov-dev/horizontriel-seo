@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Генератор статических SEO-страниц «ГоризонТРиел».
+Генератор статических SEO-страниц Horizontriel.
 
 SEO-стратегия:
   • главный брендовый сайт: https://horizontriel.com/
@@ -26,6 +26,7 @@ from urllib.parse import urlparse, quote
 
 import config as C
 from geography import DIRECTORY, build_directory, catalog_jump, in_home_region, listing_types, location
+from listing_contract import COUNTRY_CODES, country_for, currency_for, file_urls, iso_date, newest_first, normalize_price
 from config import (
     slugify,
     type_meta,
@@ -42,6 +43,8 @@ from templates import (
     card,
     breadcrumbs_html,
     footer,
+    listing_date_html,
+    country_links,
 )
 
 SAMPLE = "--sample" in sys.argv or os.environ.get("SAMPLE") == "1"
@@ -68,12 +71,12 @@ def fetch_listings():
         "id,title,type,additional_types,tag,country,region,city,address,description,residential_complex,"
         "completion_date,promotion,price,area,living_area,kitchen_area,year,floor,"
         "floors,rooms,land,land_purpose,plot_frontage,wall_material,communications,"
-        "condition,deal,published,featured,sort_order,features,images,floorplans,"
-        "created,updated"
+        "condition,deal,published,featured,sort_order,features,images,floorplans,videos,"
+        "currency,published_at,created,updated"
     )
     url = (
         f"{C.PB_URL}/api/collections/{C.PB_COLLECTION}/records"
-        f"?filter=(published=true)&sort=sort_order,created,id"
+        f"?filter=(published=true)&sort=-created,id"
         f"&perPage=500&fields={quote(fields)}"
     )
     rows = {}
@@ -116,26 +119,7 @@ def fetch_settings():
 # ─────────────────────────── нормализация ───────────────────────────
 
 def _files_to_urls(rec_id, raw):
-    if not raw:
-        return []
-
-    arr = raw if isinstance(raw, list) else [raw]
-    out = []
-
-    for f in arr:
-        name = f.get("name") if isinstance(f, dict) else f
-
-        if not name:
-            continue
-
-        if isinstance(name, str) and name.startswith("http"):
-            out.append(name)
-        else:
-            out.append(
-                f"{C.PB_URL}/api/files/{C.PB_COLLECTION}/{rec_id}/{name}"
-            )
-
-    return out
+    return file_urls(rec_id, raw)
 
 
 def _norm_feature(s):
@@ -165,7 +149,7 @@ def normalize(r):
         "type": r.get("type"),
         "tag": r.get("tag"),
         "region": r.get("region"),
-        "country": r.get("country"),
+        "country": country_for(r),
         "additional_types": r.get("additional_types") or [],
         "city": canonical_city(r.get("city")),
         "address": r.get("address"),
@@ -173,7 +157,9 @@ def normalize(r):
         "residential_complex": r.get("residential_complex"),
         "completion_date": r.get("completion_date"),
         "promotion": r.get("promotion"),
-        "price": int(r.get("price") or 0),
+        "price": normalize_price(r.get("price")),
+        "currency": currency_for(r),
+        "_currency_explicit": bool(str(r.get("currency") or "").strip()) or bool(r.get("_currency_explicit")),
         "area": r.get("area"),
         "living_area": r.get("living_area"),
         "kitchen_area": r.get("kitchen_area"),
@@ -196,6 +182,8 @@ def normalize(r):
             r.get("id"),
             r.get("floorplans") or r.get("floorplan") or r.get("plans")
         ),
+        "videos": file_urls(r.get("id"), r.get("videos"), videos=True),
+        "published_at": iso_date(r.get("published_at")),
         "createdAt": r.get("created"),
         "updatedAt": r.get("updated"),
     }
@@ -370,11 +358,12 @@ def obj_url(o):
 # ─────────────────────────── помощники ───────────────────────────
 
 def price_stats(objs):
-    prices = [
-        o["price"]
-        for o in objs
-        if o.get("price")
-    ]
+    priced = [o for o in objs if o.get("price")]
+    currencies = {o.get("currency") for o in priced}
+    currency = next(iter(currencies)) if len(currencies) == 1 else None
+    # A minimum across RUB/EUR/etc. would be a fictitious comparison. Unknown
+    # currencies also suppress aggregate price claims, even among local objects.
+    prices = [o["price"] for o in priced] if currency else []
 
     areas = []
     for o in objs:
@@ -390,6 +379,7 @@ def price_stats(objs):
         "n": len(objs),
         "min": min(prices) if prices else 0,
         "max": max(prices) if prices else 0,
+        "currency": currency,
         "avg_area": round(sum(areas) / len(areas)) if areas else 0,
     }
 
@@ -414,7 +404,7 @@ def facts_row(st, _genpl=""):
     if st["min"]:
         cells.append(
             '<div class="fact">'
-            f'<div class="n">{esc(fmt_price_plain(st["min"]))}</div>'
+            f'<div class="n">{esc(fmt_price_plain(st["min"], st["currency"]))}</div>'
             '<div class="l">Цена от</div>'
             '</div>'
         )
@@ -481,7 +471,8 @@ def object_metadata(o):
             x
             for x in (
                 o.get("city"),
-                o.get("region")
+                o.get("region"),
+                o.get("country")
             )
             if x
         ]
@@ -495,7 +486,7 @@ def object_metadata(o):
 
     if o.get("price"):
         title_bits.append(
-            fmt_price_plain(o["price"])
+            fmt_price_plain(o["price"], o.get("currency"))
         )
 
     seo_title = (
@@ -512,6 +503,7 @@ def object_metadata(o):
         [
             x
             for x in (
+                o.get("country"),
                 o.get("region"),
                 o.get("city"),
                 o.get("address")
@@ -531,7 +523,7 @@ def object_metadata(o):
 
     if o.get("price"):
         d_bits.append(
-            fmt_price_plain(o["price"])
+            fmt_price_plain(o["price"], o.get("currency"))
         )
 
     seo_desc = ". ".join(d_bits)[:240]
@@ -570,14 +562,15 @@ def render_object(o, settings, similar, metadata=None):
     tmeta = type_meta(o.get("type"))
 
     place = " · ".join(
-        [
+        dict.fromkeys([
             x
             for x in (
+                o.get("country"),
                 o.get("region"),
                 o.get("city")
             )
             if x
-        ]
+        ])
     )
 
     seo_title, seo_desc = metadata or object_metadata(o)
@@ -585,6 +578,7 @@ def render_object(o, settings, similar, metadata=None):
     # Галерея
     imgs = o.get("images") or []
     plans = o.get("floorplans") or []
+    videos = o.get("videos") or []
 
     gal = '<div class="gallery">'
 
@@ -621,7 +615,17 @@ def render_object(o, settings, similar, metadata=None):
             + "</div>"
         )
 
-    if not imgs and not plans:
+    if videos:
+        gal += '<section class="object-videos" aria-label="Видео объекта"><h2>Видео объекта</h2>'
+        for i, url in enumerate(videos):
+            mime = "video/webm" if urlparse(url).path.lower().endswith(".webm") else "video/mp4"
+            poster = f' poster="{esc_attr(imgs[0])}"' if imgs else ""
+            gal += (f'<video controls playsinline preload="metadata"{poster} aria-label="Видео объекта {i + 1}">'
+                    f'<source src="{esc_attr(url)}" type="{mime}">'
+                    f'<a href="{esc_attr(url)}">Открыть видео {i + 1}</a></video>')
+        gal += '</section>'
+
+    if not imgs and not plans and not videos:
         gal += (
             '<div class="gal-main card-noimg">'
             '<span>Фото готовится</span>'
@@ -637,6 +641,7 @@ def render_object(o, settings, similar, metadata=None):
         if value not in (None, "", 0):
             params_list.append((label, value))
 
+    add("Страна", o.get("country"))
     add("Регион", o.get("region"))
     add("Город", o.get("city"))
     add("ЖК", o.get("residential_complex"))
@@ -749,7 +754,7 @@ def render_object(o, settings, similar, metadata=None):
             if place
             else ""
         )
-        + f' — {fmt_price_plain(o.get("price"))}\n'
+        + f' — {fmt_price_plain(o.get("price"), o.get("currency"))}\n'
         + url_abs
     )
 
@@ -782,7 +787,7 @@ def render_object(o, settings, similar, metadata=None):
     price_row = (
         '<div class="price-row">'
         f'<div class="price-big">'
-        f'{esc(fmt_price_plain(o.get("price")))}'
+        f'{esc(fmt_price_plain(o.get("price"), o.get("currency")))}'
         '</div>'
         + (
             f'<span class="deal">'
@@ -837,7 +842,7 @@ def render_object(o, settings, similar, metadata=None):
             '<div class="grid">'
             + "".join(
                 card(s)
-                for s in similar[:4]
+                for s in newest_first(similar)[:4]
             )
             + "</div></div>"
         )
@@ -854,6 +859,7 @@ def render_object(o, settings, similar, metadata=None):
             else ""
         )
         + f'<h1>{esc(o.get("title") or "Объект недвижимости")}</h1>'
+        + listing_date_html(o)
         + price_row
         + catalog_jump(tmeta["slug"] if o.get("type") else "",
                        country=country, region=region, city=city or None)
@@ -882,18 +888,13 @@ def render_object(o, settings, similar, metadata=None):
             or object_metadata(o)[1]
         ),
         "url": url_abs,
-        "datePosted": (
-            str(o.get("createdAt"))[:10]
-            if o.get("createdAt")
-            else None
-        ),
         "image": (
             o.get("images")
             or []
         )[:12],
         "address": {
             "@type": "PostalAddress",
-            **({"addressCountry": o["country"]} if o.get("country") else
+            **({"addressCountry": COUNTRY_CODES.get(o["country"], o["country"])} if o.get("country") else
                {"addressCountry": "RU"} if in_home_region(o) else {}),
             "addressRegion": (
                 o.get("region")
@@ -908,19 +909,16 @@ def render_object(o, settings, similar, metadata=None):
                 or ""
             ),
         },
-        "offers": {
-            "@type": "Offer",
-            "priceCurrency": "RUB",
-            "price": (
-                o.get("price")
-                or None
-            ),
-            "availability": (
-                "https://schema.org/InStock"
-            ),
-            "url": url_abs,
-        },
     }
+    if o.get("published_at"):
+        ld_listing["datePosted"] = o["published_at"]
+    elif iso_date(o.get("createdAt")):
+        ld_listing["dateCreated"] = iso_date(o["createdAt"])
+    if o.get("price") and o.get("currency"):
+        ld_listing["offers"] = {
+            "@type": "Offer", "priceCurrency": o["currency"], "price": o["price"],
+            "availability": "https://schema.org/InStock", "url": url_abs,
+        }
 
     ld_bc = {
         "@context": "https://schema.org",
@@ -1023,6 +1021,7 @@ def render_cluster(
     robots="index, follow, max-image-preview:large",
 ):
     url_abs = C.SITE_BASE + path
+    objs = newest_first(objs)
 
     if not objs:
         body = (
@@ -1240,17 +1239,15 @@ def render_hub(
 ):
     """Корень SEO-каталога индексируется с canonical на собственный URL."""
     seo_title = (
-        "Каталог недвижимости в Ставропольском крае"
+        "Недвижимость в России и за рубежом"
         f" | {C.BRAND}"
     )
 
     seo_desc = (
         f"{C.BRAND} — каталог недвижимости "
-        "в Ставропольском крае и на КМВ. "
-        "Квартиры, дома, участки, гаражи и коммерческие объекты "
-        "в Кисловодске, Пятигорске, Ессентуках, "
-        "Железноводске, Минеральных Водах, Лермонтове, "
-        "Георгиевске и Ставрополе."
+        "в России, на Кипре, в Турции, ОАЭ и Испании. "
+        "Квартиры, дома, участки и коммерческие объекты. "
+        "Выберите страну, город и подходящее предложение."
     )
 
     st = price_stats(objs)
@@ -1313,17 +1310,13 @@ def render_hub(
         if v
     ]
 
-    featured = [
-        o
-        for o in objs
-        if o.get("featured")
-    ][:8] or objs[:8]
+    recent = newest_first(objs)[:12]
 
     feat_grid = (
         '<div class="grid">'
         + "".join(
             card(o)
-            for o in featured
+            for o in recent
         )
         + "</div>"
     )
@@ -1331,37 +1324,36 @@ def render_hub(
     intro = (
         '<div class="prose">'
         f'<p>{C.BRAND} помогает купить и продать недвижимость '
-        'в Ставропольском крае и на Кавказских Минеральных Водах: '
+        'в России и за рубежом: '
         'квартиры, апартаменты, дома, коттеджи, таунхаусы, '
         'дуплексы, земельные участки, гаражи и коммерческие объекты. '
-        'Основные направления — Кисловодск, Пятигорск, Ессентуки, '
-        'Железноводск, Минеральные Воды, Лермонтов, Георгиевск '
-        'и Ставрополь.</p>'
+        'Начните со страны или города; новые предложения показаны первыми.</p>'
         f'<p>Сейчас в каталоге {st["n"]} '
         f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
         + (
-            f', цены от {fmt_price_plain(st["min"])}'
+            f', цены от {fmt_price_plain(st["min"], st["currency"])}'
             if st["min"]
             else ""
         )
         + '. Для каждого объекта доступна информация о характеристиках, '
-        'стоимости и местоположении. Помогаем с проверкой, ипотекой '
-        'и сопровождением сделки.</p>'
+        'стоимости и местоположении. Цены указаны в валюте объявления '
+        'без автоматического пересчёта.</p>'
         '</div>'
     )
 
     body = (
         '<div class="wrap section">'
         '<div class="eyebrow">'
-        'Каталог · Ставропольский край и КМВ'
+        'Каталог · Россия и зарубежные направления'
         '</div>'
         '<h1>Недвижимость '
-        '<em>в Ставропольском крае</em></h1>'
+        '<em>в России и за рубежом</em></h1>'
+        + country_links()
         + facts_row(st)
         + intro
         + '</div>'
         + '<div class="wrap section">'
-        '<h2>По типу недвижимости</h2>'
+        '<h2>Региональные каталоги по типу недвижимости</h2>'
         + link_list(type_links)
         + '</div>'
         + (
@@ -1381,7 +1373,7 @@ def render_hub(
             else ""
         )
         + '<div class="wrap section">'
-        '<h2>Избранные объекты</h2>'
+        '<h2>Новые объекты</h2>'
         + feat_grid
         + '</div>'
         + footer(
@@ -1406,10 +1398,7 @@ def render_hub(
             "url": C.MAIN_SITE + "/",
             "email": settings["email"],
             "telephone": settings["tel"],
-            "areaServed": {
-                "@type": "AdministrativeArea",
-                "name": C.SEO_REGION,
-            },
+            "areaServed": [{"@type": "Country", "name": name} for name in COUNTRY_CODES],
             "sameAs": [
                 x
                 for x in (
@@ -1590,14 +1579,14 @@ def cluster_texts_city_type(
         seo_desc = (
             f'Коммерческая недвижимость {cp}, Ставропольский край: купить или продать помещение, офис, гостиницу, базу отдыха или другой коммерческий объект. '
             f'{st["n"]} {plural_ru(st["n"], "объект", "объекта", "объектов")} в каталоге'
-            + (f', цены от {fmt_price_plain(st["min"])}' if st["min"] else '')
+            + (f', цены от {fmt_price_plain(st["min"], st["currency"])}' if st["min"] else '')
             + '. Оценка, поиск покупателя, проверка и сопровождение сделки.'
         )
         paras = [
             (
                 f'Коммерческая недвижимость {cp}: актуальные предложения для покупки и услуги по продаже коммерческих объектов. '
                 f'В каталоге {st["n"]} {plural_ru(st["n"], "объект", "объекта", "объектов")}'
-                + (f', цены от {fmt_price_plain(st["min"])} до {fmt_price_plain(st["max"])}' if st["min"] else '')
+                + (f', цены от {fmt_price_plain(st["min"], st["currency"])} до {fmt_price_plain(st["max"], st["currency"])}' if st["min"] else '')
                 + '. Работаем с помещениями, офисами, гостиницами, базами отдыха и другими объектами.'
             ),
             (
@@ -1638,7 +1627,7 @@ def cluster_texts_city_type(
         f'{plural_ru(st["n"], "объект", "объекта", "объектов")} '
         'в каталоге'
         + (
-            f', цены от {fmt_price_plain(st["min"])}'
+            f', цены от {fmt_price_plain(st["min"], st["currency"])}'
             if st["min"]
             else ""
         )
@@ -1654,7 +1643,7 @@ def cluster_texts_city_type(
             f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
             + (
                 f', цены начинаются от '
-                f'{fmt_price_plain(st["min"])}'
+                f'{fmt_price_plain(st["min"], st["currency"])}'
                 if st["min"]
                 else ""
             )
@@ -1681,8 +1670,8 @@ def cluster_texts_city_type(
                 f'В каталоге {st["n"]} '
                 f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
                 + (
-                    f', цены от {fmt_price_plain(st["min"])} '
-                    f'до {fmt_price_plain(st["max"])}'
+                    f', цены от {fmt_price_plain(st["min"], st["currency"])} '
+                    f'до {fmt_price_plain(st["max"], st["currency"])}'
                     if st["min"]
                     else ""
                 )
@@ -1735,7 +1724,7 @@ def cluster_texts_city(
         f'{st["n"]} '
         f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
         + (
-            f', цены от {fmt_price_plain(st["min"])}'
+            f', цены от {fmt_price_plain(st["min"], st["currency"])}'
             if st["min"]
             else ""
         )
@@ -1750,7 +1739,7 @@ def cluster_texts_city(
             f'В каталоге {st["n"]} '
             f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
             + (
-                f', цены от {fmt_price_plain(st["min"])}'
+                f', цены от {fmt_price_plain(st["min"], st["currency"])}'
                 if st["min"]
                 else ""
             )
@@ -1807,7 +1796,7 @@ def cluster_texts_region(
         f'{st["n"]} '
         f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
         + (
-            f', цены от {fmt_price_plain(st["min"])}'
+            f', цены от {fmt_price_plain(st["min"], st["currency"])}'
             if st["min"]
             else ""
         )
@@ -1825,7 +1814,7 @@ def cluster_texts_region(
             f'В подборке {st["n"]} '
             f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
             + (
-                f', цены от {fmt_price_plain(st["min"])}'
+                f', цены от {fmt_price_plain(st["min"], st["currency"])}'
                 if st["min"]
                 else ""
             )
@@ -1855,14 +1844,14 @@ def cluster_texts_type(
         seo_desc = (
             f'Коммерческая недвижимость в Ставропольском крае: купить или продать коммерческий объект. '
             f'{st["n"]} {plural_ru(st["n"], "объект", "объекта", "объектов")} в каталоге'
-            + (f', цены от {fmt_price_plain(st["min"])}' if st["min"] else '')
+            + (f', цены от {fmt_price_plain(st["min"], st["currency"])}' if st["min"] else '')
             + '. Кисловодск, Пятигорск, Ессентуки, Железноводск, Минеральные Воды, Лермонтов, Георгиевск и Ставрополь. Оценка, подбор, поиск покупателя и сопровождение сделки.'
         )
         paras = [
             (
                 'Покупка и продажа коммерческой недвижимости в Ставропольском крае и на КМВ. '
                 f'В каталоге {st["n"]} {plural_ru(st["n"], "объект", "объекта", "объектов")}'
-                + (f', цены от {fmt_price_plain(st["min"])} до {fmt_price_plain(st["max"])}' if st["min"] else '')
+                + (f', цены от {fmt_price_plain(st["min"], st["currency"])} до {fmt_price_plain(st["max"], st["currency"])}' if st["min"] else '')
                 + '. Работаем с коммерческими помещениями, офисами, гостиницами, базами отдыха и другими объектами.'
             ),
             (
@@ -1903,7 +1892,7 @@ def cluster_texts_type(
         f'{st["n"]} '
         f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
         + (
-            f', цены от {fmt_price_plain(st["min"])}'
+            f', цены от {fmt_price_plain(st["min"], st["currency"])}'
             if st["min"]
             else ""
         )
@@ -1918,8 +1907,8 @@ def cluster_texts_type(
             f'В каталоге {st["n"]} '
             f'{plural_ru(st["n"], "объект", "объекта", "объектов")}'
             + (
-                f', цены от {fmt_price_plain(st["min"])} '
-                f'до {fmt_price_plain(st["max"])}'
+                f', цены от {fmt_price_plain(st["min"], st["currency"])} '
+                f'до {fmt_price_plain(st["max"], st["currency"])}'
                 if st["min"]
                 else ""
             )
@@ -2017,10 +2006,11 @@ def build():
         raw = fetch_listings()
         settings = fetch_settings()
 
-    all_objs = [
+    all_objs = newest_first([
         normalize(r)
         for r in raw
-    ]
+        if r.get("published") is not False
+    ])
 
     # Read existing paths before clearing the static output; never change canonical
     # paths when a title is edited or extra placement categories are selected.
@@ -2196,7 +2186,7 @@ def build():
     write_page(
         "/",
         render_hub(
-            objs,
+            all_objs,
             by_type,
             by_city,
             by_region,
@@ -2612,6 +2602,12 @@ def build():
     write_robots()
     write_cname()
 
+    # Pinned, self-hosted map dependencies are part of the Pages artifact. This
+    # copy is local and deterministic; the build never fetches vendor assets.
+    assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+    if os.path.isdir(assets_dir):
+        shutil.copytree(assets_dir, os.path.join(C.OUT_DIR, "assets"), dirs_exist_ok=True)
+
     # Persist URLs only after a complete successful static build.
     htseo_save_stable_urls(htseo_url_history)
 
@@ -2641,7 +2637,7 @@ def build():
         f"в sitemap: {len(urls)}"
     )
     print(
-        f"  — объектов: {len(objs)}"
+        f"  — объектов: {len(all_objs)}"
     )
 
     empty_priority_cities = [
