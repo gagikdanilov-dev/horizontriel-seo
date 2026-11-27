@@ -21,7 +21,7 @@ import build
 import config as C
 import geography
 import templates
-from listing_contract import currency_for, newest_first
+from listing_contract import country_for, currency_for, newest_first
 
 
 class Document(HTMLParser):
@@ -112,6 +112,72 @@ def paths_for(root):
 
 
 class InternationalIntegration(unittest.TestCase):
+    def test_known_legacy_region_keeps_urls_and_respects_explicit_country_currency(self):
+        legacy = record("legacys", country="", region="Ставропольский", currency="", price=13_000_000)
+        foreign = record("foreigns", country="Spain", region="Ставропольский", currency="EUR")
+        explicit_russia = record("explicitru", country="RU", region="Ставропольский", currency="RUB")
+        unknown = record("unknowns", region="Неизвестный регион", city="Кисловодск")
+        self.assertEqual(country_for(legacy), "Россия")
+        normalized = build.normalize(legacy)
+        self.assertEqual((normalized["country"], normalized["currency"], normalized["region"]),
+                         ("Россия", "RUB", "Ставропольский"))
+        self.assertEqual(currency_for(normalized), "RUB")
+        self.assertEqual(geography.location(normalized), ("Россия", "Ставропольский", "Кисловодск"))
+        # Preserve regional membership and its established URL scheme as well as raw region.
+        self.assertFalse(geography.in_home_region(normalized))
+        self.assertEqual(country_for(foreign), "Испания")
+        self.assertEqual(build.normalize(foreign)["currency"], "EUR")
+        self.assertIsNone(currency_for(dict(foreign, currency="")))
+        self.assertEqual(currency_for(dict(legacy, currency="USD")), "USD")
+        invalid = build.normalize(dict(legacy, currency="XYZ"))
+        self.assertIsNone(invalid["currency"])
+        self.assertIsNone(currency_for(invalid))
+        self.assertEqual(country_for(unknown), "")
+        self.assertIsNone(currency_for(unknown))
+        self.assertEqual(country_for(dict(legacy, region="Ставропольский городской")), "")
+        self.assertEqual(country_for(dict(legacy, country="Atlantis")), "Atlantis")
+        self.assertIsNone(currency_for(dict(legacy, country="Atlantis")))
+
+        retained = {legacy["id"]: "/obekt/already-published-egacys/"}
+        # Historical digest of (unknown country, exact legacy region, Кисловодск).
+        legacy_directory = "/geografiya/kislovodsk-dda9f2a45f2707b8/kvartiry/"
+        with built(inventory() + [legacy, foreign, explicit_russia], retained) as (root, _):
+            history = paths_for(root)
+            self.assertEqual(history[legacy["id"]], retained[legacy["id"]])
+            html = page_text(root, retained[legacy["id"]])
+            doc = Document(html)
+            self.assertEqual(doc.tags("link", rel="canonical")[0]["href"], C.SITE_BASE + retained[legacy["id"]])
+            listing = doc.structured[0]
+            self.assertEqual(listing["address"]["addressCountry"], "RU")
+            self.assertEqual(listing["address"]["addressRegion"], "Ставропольский")
+            self.assertEqual(listing["offers"]["priceCurrency"], "RUB")
+            self.assertEqual(listing["offers"]["price"], 13_000_000)
+            self.assertIn(C.fmt_price_plain(13_000_000, "RUB"), html)
+            foreign_ld = Document(page_text(root, history[foreign["id"]])).structured[0]
+            self.assertEqual(foreign_ld["address"]["addressCountry"], "ES")
+            self.assertEqual(foreign_ld["address"]["addressRegion"], "Ставропольский")
+            self.assertEqual(foreign_ld["offers"]["priceCurrency"], "EUR")
+            feed = json.loads((root / "dist/geografiya/cities.json").read_text())
+            local = next(x for x in feed["kvartiry"] if x["area"] == "Россия · Ставропольский")
+            overseas = next(x for x in feed["kvartiry"] if x["area"] == "Испания · Ставропольский")
+            self.assertEqual(local["path"], legacy_directory)
+            self.assertEqual(local["count"], 2)
+            self.assertEqual(sum(x["area"] == "Россия · Ставропольский" for x in feed["kvartiry"]), 1)
+            self.assertNotEqual(overseas["path"], local["path"])
+            directory_html = page_text(root, legacy_directory)
+            directory = Document(directory_html)
+            self.assertEqual(directory.tags("link", rel="canonical")[0]["href"], C.SITE_BASE + legacy_directory)
+            self.assertIn(retained[legacy["id"]], directory.card_links())
+            self.assertIn(history[explicit_russia["id"]], directory.card_links())
+            jumps = [parse_qs(urlsplit(a["href"]).fragment.split("?", 1)[1])
+                     for a in directory.tags("a") if "#catalog?" in a.get("href", "")]
+            self.assertTrue(any(q.get("geo_country") == ["Россия"] and
+                                q.get("geo_region") == ["Ставропольский"] for q in jumps))
+            urls = {n.text for n in ET.parse(root / "dist/sitemap.xml").iter() if n.tag.endswith("}loc")}
+            for path in [retained[legacy["id"]], legacy_directory, "/gorod/kislovodsk/",
+                         "/gorod/kislovodsk/kvartiry/", "/region/stavropolskiy-kray/"]:
+                self.assertIn(C.SITE_BASE + path, urls)
+
     def test_full_build_keeps_international_inventory_and_regional_urls(self):
         rows = inventory()
         with built(rows) as (root, _):
