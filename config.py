@@ -30,10 +30,9 @@ OUT_DIR = os.environ.get("OUT_DIR", "dist")
 COUNTRY_PAGES = {
     "Кипр": "/cyprus", "Турция": "/turkey", "Дубай": "/dubai", "Испания": "/spain",
 }
-# Enable an exact path here only after its Tilda page is published and checked.
-# Before that, country navigation uses the existing main-site catalog router.
-# Keep this explicit and empty for the first SEO/vendor-assets deployment.
-PUBLISHED_COUNTRY_PAGES = frozenset()
+# Exact Tilda paths verified as published on 2026-11-27.
+# Other destinations keep using the existing main-site catalog router.
+PUBLISHED_COUNTRY_PAGES = frozenset({"/cyprus", "/turkey", "/dubai", "/spain"})
 CURRENCY_LABELS = {"RUB": "₽", "EUR": "€", "USD": "USD", "AED": "AED", "TRY": "TRY"}
 
 # ── Основной SEO-регион ──
