@@ -20,6 +20,8 @@ COUNTRY_ALIASES = {
     "Испания": ("es", "esp", "spain", "españa", "испания"),
 }
 _COUNTRIES = {alias.casefold(): label for label, aliases in COUNTRY_ALIASES.items() for alias in aliases}
+# One observed legacy spelling; do not infer countries from arbitrary region/city names.
+LEGACY_RUSSIAN_REGION = "Ставропольский"
 
 
 def clean(value):
@@ -31,7 +33,7 @@ def country_for(obj):
     if explicit:
         return _COUNTRIES.get(explicit.casefold(), explicit)
     region = clean(obj.get("region"))
-    if region.casefold() == C.SEO_REGION.casefold():
+    if region.casefold() in {C.SEO_REGION.casefold(), LEGACY_RUSSIAN_REGION.casefold()}:
         return "Россия"
     # Older records sometimes store the country in region. Retain region in the
     # normalized record so existing filters and links continue to match it.

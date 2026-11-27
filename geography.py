@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import config as C
 from templates import breadcrumbs_html, card, country_links, esc, esc_attr, page
-from listing_contract import country_for, newest_first
+from listing_contract import LEGACY_RUSSIAN_REGION, country_for, newest_first
 
 
 DIRECTORY = "/geografiya/"
@@ -160,7 +160,13 @@ def build_directory(objects, local_paths, write_page, urls):
             if in_home_region(rows[0]) and local_paths.get(local_path) == ids:
                 path = local_path
             else:
-                digest = sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()[:16]
+                # This exact legacy region already had a public directory URL
+                # when its country was unknown. Correct its label/filter while
+                # retaining that URL; explicit foreign countries stay distinct.
+                path_identity = (("", identity[1], identity[2])
+                                 if country == "Россия" and region.casefold() == LEGACY_RUSSIAN_REGION.casefold()
+                                 else identity)
+                digest = sha256(json.dumps(path_identity, ensure_ascii=False).encode()).hexdigest()[:16]
                 slug = C.slugify(city)[:60] or "city"
                 path = f'{DIRECTORY}{slug}-{digest}/{category}/'
                 heading = " — ".join(x for x in (meta["plural"], city, area) if x)
