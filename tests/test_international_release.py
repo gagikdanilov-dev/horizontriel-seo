@@ -135,7 +135,7 @@ class InternationalIntegration(unittest.TestCase):
             self.assertNotIn("ГоризонТРиел", home)
             self.assertIn("в России и за рубежом", home)
             for path in C.COUNTRY_PAGES.values():
-                self.assertNotIn('href="' + C.MAIN_SITE + path + '"', home)
+                self.assertIn('href="' + C.MAIN_SITE + path + '"', home)
             self.assertIn("geo_country=", home)
             feed = json.loads((root / "dist/geografiya/cities.json").read_text())
             same_name = [x for x in feed["kvartiry"] if x["city"] == "Одинаковый город"]
