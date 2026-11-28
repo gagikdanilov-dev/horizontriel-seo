@@ -26,7 +26,7 @@ from urllib.parse import urlparse, quote
 
 import config as C
 from geography import DIRECTORY, build_directory, catalog_jump, in_home_region, listing_types, location
-from listing_contract import COUNTRY_CODES, country_for, currency_for, file_urls, iso_date, newest_first, normalize_price
+from listing_contract import COUNTRY_CODES, basement_floor, country_for, currency_for, file_urls, iso_date, newest_first, normalize_price
 from config import (
     slugify,
     type_meta,
@@ -645,7 +645,8 @@ def render_object(o, settings, similar, metadata=None):
     add("Регион", o.get("region"))
     add("Город", o.get("city"))
     add("ЖК", o.get("residential_complex"))
-    add("Срок сдачи", o.get("completion_date"))
+    completion = str(o.get("completion_date") or "").strip()
+    add("Срок сдачи", completion if completion.casefold() != "т" else None)
     add(
         "Общая площадь",
         f'{o["area"]} м²'
@@ -658,21 +659,26 @@ def render_object(o, settings, similar, metadata=None):
         if o.get("living_area")
         else None
     )
+    kitchen, overall = normalize_price(o.get("kitchen_area")), normalize_price(o.get("area"))
     add(
         "Площадь кухни",
-        f'{o["kitchen_area"]} м²'
-        if o.get("kitchen_area")
+        f'{kitchen} м²'
+        if kitchen and (not overall or kitchen <= overall)
         else None
     )
     add("Комнат", o.get("rooms"))
 
-    if o.get("floor") and o.get("floors"):
+    if basement_floor(o):
+        add("Этаж", "Цокольный")
+    elif o.get("floor") and o.get("floors"):
         add(
             "Этаж",
             f'{o["floor"]} из {o["floors"]}'
         )
     elif o.get("floor"):
         add("Этаж", o.get("floor"))
+    elif o.get("floors"):
+        add("Этажность", o.get("floors"))
 
     add("Год", o.get("year"))
     add(

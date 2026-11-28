@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import config as C
 from config import BRAND, SITE_BASE, MAIN_SITE, COUNTRY_PAGES, fmt_price_plain
-from listing_contract import listing_date
+from listing_contract import basement_floor, complex_label, is_recent_listing, listing_date
 
 
 # Коды подтверждения прав в поисковиках.
@@ -438,7 +438,7 @@ def card(obj):
 
     tag = ""
 
-    if obj.get("tag") == "new":
+    if obj.get("tag") == "new" and is_recent_listing(obj):
         tag = (
             '<span class="tag">Новое</span>'
         )
@@ -449,13 +449,9 @@ def card(obj):
 
     meta_bits = []
 
-    if obj.get("residential_complex"):
-        meta_bits.append(
-            "ЖК "
-            + str(
-                obj["residential_complex"]
-            )
-        )
+    complex_name = complex_label(obj.get("residential_complex"))
+    if complex_name:
+        meta_bits.append(complex_name)
 
     if obj.get("area"):
         meta_bits.append(
@@ -472,10 +468,15 @@ def card(obj):
             f'{obj["land"]} сот.'
         )
 
-    if obj.get("floors"):
-        meta_bits.append(
-            f'{obj["floors"]} эт.'
-        )
+    if basement_floor(obj):
+        meta_bits.append("Цокольный этаж")
+    elif obj.get("floor"):
+        floor = f'Этаж {obj["floor"]}'
+        if obj.get("floors"):
+            floor += f' из {obj["floors"]}'
+        meta_bits.append(floor)
+    elif obj.get("floors"):
+        meta_bits.append(f'Этажность: {obj["floors"]}')
 
     meta = " · ".join(
         meta_bits

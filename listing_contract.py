@@ -28,6 +28,26 @@ def clean(value):
     return " ".join(str(value or "").split())
 
 
+def complex_label(value):
+    title = str(value or "").strip()
+    if not title or re.match(r"^жк(?=$|[\s«»\"'“”„(])", title, re.I):
+        return title
+    return "ЖК " + title
+
+
+def basement_floor(obj):
+    source = str(obj.get("desc") or obj.get("description") or "")
+    return bool(re.search(r"(?:^|[.!?\n])\s*цокольный этаж\s*(?=[.!?]|$)", source, re.I))
+
+
+def is_recent_listing(obj, now=None):
+    stamp, _ = listing_date(obj)
+    if stamp is None:
+        return False
+    days = ((now or datetime.now(timezone.utc)) - stamp).total_seconds() / 86400
+    return 0 <= days <= 30
+
+
 def country_for(obj):
     explicit = clean(obj.get("country"))
     if explicit:
