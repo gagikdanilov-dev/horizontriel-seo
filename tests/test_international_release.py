@@ -4,6 +4,7 @@ Run from seo/: python -m unittest discover -s tests -v
 All network access is forbidden in the fixture; output/history use a temp dir.
 """
 from contextlib import ExitStack, contextmanager, redirect_stdout
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 import io
 import hashlib
@@ -21,7 +22,7 @@ import build
 import config as C
 import geography
 import templates
-from listing_contract import country_for, currency_for, newest_first
+from listing_contract import country_for, currency_for, is_recent_listing, newest_first
 
 
 class Document(HTMLParser):
@@ -112,6 +113,32 @@ def paths_for(root):
 
 
 class InternationalIntegration(unittest.TestCase):
+    def test_listing_labels_preserve_complex_names_and_distinguish_unit_floor(self):
+        valid = record("unit", residential_complex='жк\u00a0«Волна»', floor=6, floors=12, kitchen_area=11.3)
+        basement = record("below", description="Первая линия. Цокольный этаж. В продаже два помещения.", floor=1,
+                          floors=5, kitchen_area=111, completion_date="т")
+        missing = record("unset", residential_complex='«Волна»', floors=12,
+                         description="Бассейн занимает цокольный этаж комплекса.")
+        self.assertTrue(is_recent_listing({"created":"2026-11-12T00:00:00Z"}, datetime(2026,11,28,tzinfo=timezone.utc)))
+        self.assertFalse(is_recent_listing(valid, datetime(2026,11,28,tzinfo=timezone.utc)))
+        with built([valid, basement, missing]) as (root, _):
+            listing_paths = paths_for(root)
+            hub = page_text(root, "/")
+            self.assertIn('жк\u00a0«Волна»', hub)
+            self.assertIn('ЖК «Волна»', hub)
+            self.assertNotIn('ЖК жк', hub)
+            self.assertIn('Этаж 6 из 12', hub)
+            self.assertIn('Этажность: 12', hub)
+            self.assertIn('Цокольный этаж', hub)
+            valid_html = page_text(root,listing_paths[valid['id']])
+            self.assertIn('11.3 м²', valid_html)
+            basement_html = page_text(root,listing_paths[basement['id']])
+            self.assertIn('<div class="pval">Цокольный</div>', basement_html)
+            self.assertNotIn('111 м²', basement_html)
+            self.assertNotIn('Срок сдачи', basement_html)
+            missing_html = page_text(root,listing_paths[missing['id']])
+            self.assertIn('Этажность', missing_html)
+
     def test_known_legacy_region_keeps_urls_and_respects_explicit_country_currency(self):
         legacy = record("legacys", country="", region="Ставропольский", currency="", price=13_000_000)
         foreign = record("foreigns", country="Spain", region="Ставропольский", currency="EUR")
